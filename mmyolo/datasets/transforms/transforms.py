@@ -423,6 +423,10 @@ class LoadAnnotations(MMDET_LoadAnnotations):
             assert len(results['gt_bboxes']) == len(self._mask_ignore_flag)
             results['gt_bboxes'] = results['gt_bboxes'][self._mask_ignore_flag]
 
+    def __init__(self, with_mask: bool = False, poly2mask: bool = True, box_type: str = 'hbox', **kwargs) -> None:
+        super().__init__(with_mask, poly2mask, box_type, **kwargs)
+        self.with_keypoints = kwargs.get('with_keypoints', False)
+
     def _load_bboxes(self, results: dict):
         """Private function to load bounding box annotations.
         Note: BBoxes with ignore_flag of 1 is not considered.
@@ -462,7 +466,7 @@ class LoadAnnotations(MMDET_LoadAnnotations):
                 gt_bboxes_labels.append(instance['bbox_label'])
         results['gt_bboxes_labels'] = np.array(
             gt_bboxes_labels, dtype=np.int64)
-
+    
     def _load_masks(self, results: dict) -> None:
         """Private function to load mask annotations.
 
@@ -514,6 +518,26 @@ class LoadAnnotations(MMDET_LoadAnnotations):
         repr_str += f"imdecode_backend='{self.imdecode_backend}', "
         repr_str += f'file_client_args={self.file_client_args})'
         return repr_str
+
+    def _load_kps(self, results: dict) -> None:
+        gt_keypoints = []
+        for instance in results.get('instances', []):
+            if instance['ignore_flag'] == 0:
+                if "keypoints" not in instance:
+                    continue
+                gt_keypoints.append(instance['keypoints'])
+        results['gt_keypoints'] = np.array(gt_keypoints, np.float32).reshape(
+            (len(gt_keypoints), -1, 3))
+        
+    
+    def transform(self, results: dict) -> dict:
+        super().transform(results)
+        if self.with_keypoints:
+            self._load_kps(results)
+        return results
+    
+    def __repr__(self) -> str:
+        return super().__repr__() + f', with_keypoints={self.with_keypoints}'
 
 
 @TRANSFORMS.register_module()
