@@ -15,12 +15,11 @@ from mmdet.structures.bbox import (HorizontalBoxes, autocast_box_type,
                                    get_box_type)
 from mmdet.structures.mask import PolygonMasks
 from numpy import random
+from mmdet.datasets.transforms import RandomAffine
 
 from mmyolo.registry import TRANSFORMS
-
 # TODO: Waiting for MMCV support
 TRANSFORMS.register_module(module=Compose, force=True)
-
 
 @TRANSFORMS.register_module()
 class YOLOv5KeepRatioResize(MMDET_Resize):
@@ -1578,4 +1577,50 @@ class RegularizeRotatedBox(BaseTransform):
         assert isinstance(results['gt_bboxes'], self.box_type)
         results['gt_bboxes'] = self.box_type(
             results['gt_bboxes'].regularize_boxes(self.angle_version))
+        return results
+
+
+
+@TRANSFORMS.register_module()
+class YOLOPoseRandomAffine(RandomAffine):
+    @autocast_box_type()
+    def transform(self, results: dict) -> dict:
+        img = results['img']
+        height = img.shape[0] + self.border[1] * 2
+        width = img.shape[1] + self.border[0] * 2
+
+        warp_matrix = self._get_random_homography_matrix(height, width)
+
+        img = cv2.warpPerspective(
+            img,
+            warp_matrix,
+            dsize=(width, height),
+            borderValue=self.border_val)
+        results['img'] = img
+        results['img_shape'] = img.shape
+
+        bboxes = results['gt_bboxes']
+        num_bboxes = len(bboxes)
+        if num_bboxes:
+            bboxes.project_(warp_matrix)
+            if self.bbox_clip_border:
+                bboxes.clip_([height, width])
+            # remove outside bbox
+            valid_index = bboxes.is_inside([height, width]).numpy()
+            results['gt_bboxes'] = bboxes[valid_index]
+            results['gt_bboxes_labels'] = results['gt_bboxes_labels'][
+                valid_index]
+            results['gt_ignore_flags'] = results['gt_ignore_flags'][
+                valid_index]
+
+            if 'gt_masks' in results:
+                raise NotImplementedError('RandomAffine only supports bbox.')
+
+        if 'gt_keypoints' in results:
+            keypoints = results['gt_keypoints']
+            keypoints = Keypoints._kpt_project(keypoints, warp_matrix)
+            if self.bbox_clip_border:
+                keypoints = Keypoints._kpt_clip(keypoints, [height, width])
+            results['gt_keypoints'] = keypoints[valid_index]
+            assert len(results['gt_bboxes']) == len(results['gt_keypoints'])
         return results
