@@ -1670,8 +1670,8 @@ class YOLOPoseRandomFlip(RandomFlip):
 
         # flip keypoints
         if results.get('gt_keypoints', None) is not None:
-            results['gt_keypoints'] = Keypoints._kpt_flip(
-                results['gt_keypoints'], img_shape, results['flip_direction'])
+            results['gt_keypoints'], results['gt_keypoints_visible'] = Keypoints._kpt_flip(
+                results['gt_keypoints'], results['gt_keypoints_visible'], img_shape, results['flip_direction'])
 
         # record homography matrix for flip
         self._record_homography_matrix(results)
@@ -1734,6 +1734,7 @@ class YOLOPosePackInputs(PackDetInputs):
         'gt_bboxes_labels': 'labels',
         'gt_masks': 'masks',
         'gt_keypoints': 'keypoints',
+        'gt_keypoints_visible': 'keypoints_visible'
     }
 
     def __init__(self,
