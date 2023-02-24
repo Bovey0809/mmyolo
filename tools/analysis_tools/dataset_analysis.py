@@ -52,8 +52,7 @@ def parse_args():
         type=str,
         help='Output directory of dataset analysis visualization results,'
         ' Save in "./dataset_analysis/" by default')
-    args = parser.parse_args()
-    return args
+    return parser.parse_args()
 
 
 def show_bbox_num(cfg, out_dir, fig_set, class_name, class_num):
@@ -67,7 +66,7 @@ def show_bbox_num(cfg, out_dir, fig_set, class_name, class_num):
 
     # Draw titles, labels and so on
     for x, y in enumerate(class_num):
-        plt.text(x, y, '%s' % y, ha='center', fontsize=fig_set['fontsize'] + 3)
+        plt.text(x, y, f'{y}', ha='center', fontsize=fig_set['fontsize'] + 3)
     plt.xticks(rotation=fig_set['xticks_angle'])
     plt.xlabel('Category Name')
     plt.ylabel('Num of instances')
@@ -256,7 +255,7 @@ def show_bbox_area(out_dir, fig_set, area_rule, class_name, bbox_area_num):
             width,
             label=labels[i],
             color=colors[i])
-        for idx, (x, y) in enumerate(zip(positions.tolist(), area_num)):
+        for x, y in zip(positions.tolist(), area_num):
             plt.text(
                 x + width * i,
                 y,
@@ -305,10 +304,10 @@ def show_class_list(classes, class_num):
         class_info.add_column('Class name', classes)
         class_info.add_column('Bbox num', class_num)
     elif len(classes) % 25 != 0 and len(classes) > 25:
-        col_num = int(len(classes) / 25) + 1
+        col_num = len(classes) // 25 + 1
         class_nums = class_num.tolist()
         class_name_list = list(classes)
-        for i in range(0, (col_num * 25) - len(classes)):
+        for _ in range((col_num * 25) - len(classes)):
             class_name_list.append('')
             class_nums.append('')
         for i in range(0, len(class_name_list), 25):
@@ -397,7 +396,7 @@ def main():
     # Call the category name and save address
     if args.class_name is None:
         classes = dataset.metainfo['classes']
-        classes_idx = [i for i in range(len(classes))]
+        classes_idx = list(range(len(classes)))
         fig_set = fig_all_set
     elif args.class_name in dataset.metainfo['classes']:
         classes = [args.class_name]

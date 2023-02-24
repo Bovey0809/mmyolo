@@ -57,8 +57,7 @@ def parse_args():
         '--show', action='store_true', help='Show the detection results')
     parser.add_argument(
         '--score-thr', type=float, default=0.3, help='Bbox score threshold')
-    args = parser.parse_args()
-    return args
+    return parser.parse_args()
 
 
 # TODO Still need to refactor to not building dataset.

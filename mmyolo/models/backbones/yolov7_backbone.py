@@ -227,7 +227,6 @@ class YOLOv7Backbone(BaseBackbone):
         stage_block_cfg['in_channels'] = in_channels
         stage_block_cfg['out_channels'] = out_channels
 
-        stage = []
         if self.arch in ['W', 'E', 'D', 'E2E']:
             stage_block_cfg['in_channels'] = out_channels
         elif self.arch in ['L', 'X']:
@@ -236,7 +235,7 @@ class YOLOv7Backbone(BaseBackbone):
 
         downsample_layer = self._build_downsample_layer(
             stage_idx, in_channels, out_channels)
-        stage.append(MODELS.build(stage_block_cfg))
+        stage = [MODELS.build(stage_block_cfg)]
         if downsample_layer is not None:
             stage.insert(0, downsample_layer)
         return stage
@@ -261,10 +260,7 @@ class YOLOv7Backbone(BaseBackbone):
                 norm_cfg=self.norm_cfg,
                 act_cfg=self.act_cfg)
         elif self.arch == 'Tiny':
-            if stage_idx != 0:
-                downsample_layer = nn.MaxPool2d(2, 2)
-            else:
-                downsample_layer = None
+            downsample_layer = nn.MaxPool2d(2, 2) if stage_idx != 0 else None
         elif self.arch in ['L', 'X']:
             if stage_idx == 0:
                 downsample_layer = ConvModule(

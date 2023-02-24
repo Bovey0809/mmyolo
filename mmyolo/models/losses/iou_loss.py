@@ -44,8 +44,8 @@ def bbox_overlaps(pred: torch.Tensor,
     Returns:
         Tensor: shape (n, ).
     """
-    assert iou_mode in ('iou', 'ciou', 'giou', 'siou')
-    assert bbox_format in ('xyxy', 'xywh')
+    assert iou_mode in {'iou', 'ciou', 'giou', 'siou'}
+    assert bbox_format in {'xyxy', 'xywh'}
     if bbox_format == 'xywh':
         pred = HorizontalBoxes.cxcywh_to_xyxy(pred)
         target = HorizontalBoxes.cxcywh_to_xyxy(target)
@@ -81,11 +81,6 @@ def bbox_overlaps(pred: torch.Tensor,
     enclose_h = enclose_wh[..., 1]  # ch
 
     if iou_mode == 'ciou':
-        # CIoU = IoU - ( (ρ^2(b_pred,b_gt) / c^2) + (alpha x v) )
-
-        # calculate enclose area (c^2)
-        enclose_area = enclose_w**2 + enclose_h**2 + eps
-
         # calculate ρ^2(b_pred,b_gt):
         # euclidean distance between b_pred(bbox2) and b_gt(bbox1)
         # center point, because bbox format is xyxy -> left-top xy and
@@ -103,7 +98,7 @@ def bbox_overlaps(pred: torch.Tensor,
             alpha = wh_ratio / (wh_ratio - ious + (1 + eps))
 
         # CIoU
-        ious = ious - ((rho2 / enclose_area) + (alpha * wh_ratio))
+        ious = ious - (rho2 / (enclose_w**2 + enclose_h**2 + eps) + alpha * wh_ratio)
 
     elif iou_mode == 'giou':
         # GIoU = IoU - ( (A_c - union) / A_c )
@@ -175,8 +170,8 @@ class IoULoss(nn.Module):
                  loss_weight: float = 1.0,
                  return_iou: bool = True):
         super().__init__()
-        assert bbox_format in ('xywh', 'xyxy')
-        assert iou_mode in ('ciou', 'siou', 'giou')
+        assert bbox_format in {'xywh', 'xyxy'}
+        assert iou_mode in {'ciou', 'siou', 'giou'}
         self.iou_mode = iou_mode
         self.bbox_format = bbox_format
         self.eps = eps
@@ -211,8 +206,7 @@ class IoULoss(nn.Module):
                 weight = weight.unsqueeze(1)
             return (pred * weight).sum()  # 0
         assert reduction_override in (None, 'none', 'mean', 'sum')
-        reduction = (
-            reduction_override if reduction_override else self.reduction)
+        reduction = reduction_override or self.reduction
 
         if weight is not None and weight.dim() > 1:
             weight = weight.mean(-1)
@@ -226,7 +220,4 @@ class IoULoss(nn.Module):
         loss = self.loss_weight * weight_reduce_loss(1.0 - iou, weight,
                                                      reduction, avg_factor)
 
-        if self.return_iou:
-            return loss, iou
-        else:
-            return loss
+        return (loss, iou) if self.return_iou else loss

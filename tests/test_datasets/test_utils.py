@@ -18,8 +18,7 @@ def _rand_bboxes(rng, num_boxes, w, h):
     br_x = ((cx * w) + (w * bw / 2)).clip(0, w)
     br_y = ((cy * h) + (h * bh / 2)).clip(0, h)
 
-    bboxes = np.vstack([tl_x, tl_y, br_x, br_y]).T
-    return bboxes
+    return np.vstack([tl_x, tl_y, br_x, br_y]).T
 
 
 class TestYOLOv5Collate(unittest.TestCase):

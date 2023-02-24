@@ -24,13 +24,11 @@ class ToyModel(nn.Module):
         inputs = torch.stack(inputs)
         outputs = self.linear(inputs)
         if mode == 'tensor':
-            return outputs
+            pass
         elif mode == 'loss':
             loss = (labels - outputs).sum()
             outputs = dict(loss=loss)
-            return outputs
-        else:
-            return outputs
+        return outputs
 
 
 class DummyDataset(Dataset):
@@ -94,7 +92,7 @@ class TestYOLOv5ParamSchelerHook(TestCase):
         self.assertFalse(hook._warmup_end)
 
         # test after training 10 steps
-        for i in range(10):
+        for _ in range(10):
             runner.iter += 1
             hook.before_train_iter(runner, 0)
 

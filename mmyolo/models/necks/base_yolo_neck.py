@@ -222,11 +222,10 @@ class BaseYOLONeck(BaseModule, metaclass=ABCMeta):
     def forward(self, inputs: List[torch.Tensor]) -> tuple:
         """Forward function."""
         assert len(inputs) == len(self.in_channels)
-        # reduce layers
-        reduce_outs = []
-        for idx in range(len(self.in_channels)):
-            reduce_outs.append(self.reduce_layers[idx](inputs[idx]))
-
+        reduce_outs = [
+            self.reduce_layers[idx](inputs[idx])
+            for idx in range(len(self.in_channels))
+        ]
         # top-down path
         inner_outs = [reduce_outs[-1]]
         for idx in range(len(self.in_channels) - 1, 0, -1):
@@ -253,9 +252,7 @@ class BaseYOLONeck(BaseModule, metaclass=ABCMeta):
                 torch.cat([downsample_feat, feat_high], 1))
             outs.append(out)
 
-        # out_layers
-        results = []
-        for idx in range(len(self.in_channels)):
-            results.append(self.out_layers[idx](outs[idx]))
-
+        results = [
+            self.out_layers[idx](outs[idx]) for idx in range(len(self.in_channels))
+        ]
         return tuple(results)

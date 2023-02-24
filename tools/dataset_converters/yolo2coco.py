@@ -178,7 +178,7 @@ def convert_yolo_to_coco(image_dir: str):
     total = len(indices)
 
     dataset = {'images': [], 'annotations': [], 'categories': []}
-    if existed_categories == []:
+    if not existed_categories:
         print('These files are not located, no need to organize separately.')
         for i, cls in enumerate(classes, 0):
             dataset['categories'].append({'id': i, 'name': cls})
@@ -232,7 +232,7 @@ def convert_yolo_to_coco(image_dir: str):
         converted += 1
 
     # saving results to result json
-    if existed_categories == []:
+    if not existed_categories:
         out_file = osp.join(image_dir, 'annotations/result.json')
         print(f'Saving converted results to {out_file} ...')
         mmengine.dump(dataset, out_file)

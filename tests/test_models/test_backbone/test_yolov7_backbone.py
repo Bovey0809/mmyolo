@@ -48,8 +48,7 @@ class TestYOLOv7Backbone(TestCase):
         assert check_norm_state(model.modules(), False)
 
         # Test YOLOv7Backbone-L forward with widen_factor=0.25
-        model = YOLOv7Backbone(
-            widen_factor=0.25, out_indices=tuple(range(0, 5)))
+        model = YOLOv7Backbone(widen_factor=0.25, out_indices=tuple(range(5)))
         model.train()
 
         imgs = torch.randn(1, 3, 64, 64)

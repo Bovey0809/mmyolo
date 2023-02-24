@@ -68,10 +68,9 @@ class BatchShapePolicy:
         self.extra_pad_ratio = extra_pad_ratio
 
     def __call__(self, data_list: List[dict]) -> List[dict]:
-        image_shapes = []
-        for data_info in data_list:
-            image_shapes.append((data_info['width'], data_info['height']))
-
+        image_shapes = [
+            (data_info['width'], data_info['height']) for data_info in data_list
+        ]
         image_shapes = np.array(image_shapes, dtype=np.float64)
 
         n = len(image_shapes)  # number of images

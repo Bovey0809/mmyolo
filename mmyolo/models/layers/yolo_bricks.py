@@ -242,10 +242,7 @@ class RepVGGBlock(nn.Module):
         if hasattr(self, 'rbr_reparam'):
             return self.nonlinearity(self.se(self.rbr_reparam(inputs)))
 
-        if self.rbr_identity is None:
-            id_out = 0
-        else:
-            id_out = self.rbr_identity(inputs)
+        id_out = 0 if self.rbr_identity is None else self.rbr_identity(inputs)
         if self.alpha:
             return self.nonlinearity(
                 self.se(
@@ -466,14 +463,8 @@ class BottleRep(nn.Module):
         self.conv1 = MODELS.build(conv1_cfg)
         self.conv2 = MODELS.build(conv2_cfg)
 
-        if in_channels != out_channels:
-            self.shortcut = False
-        else:
-            self.shortcut = True
-        if adaptive_weight:
-            self.alpha = nn.Parameter(torch.ones(1))
-        else:
-            self.alpha = 1.0
+        self.shortcut = in_channels == out_channels
+        self.alpha = nn.Parameter(torch.ones(1)) if adaptive_weight else 1.0
 
     def forward(self, x: Tensor) -> Tensor:
         outputs = self.conv1(x)
@@ -738,9 +729,7 @@ class EELANBlock(BaseModule):
             self.e_elan_blocks.append(ELANBlock(**kwargs))
 
     def forward(self, x: Tensor) -> Tensor:
-        outs = []
-        for elan_blocks in self.e_elan_blocks:
-            outs.append(elan_blocks(x))
+        outs = [elan_blocks(x) for elan_blocks in self.e_elan_blocks]
         return sum(outs)
 
 
@@ -1039,17 +1028,12 @@ class SPPFCSPBlock(BaseModule):
             y1 = self.poolings(x1)
             y2 = self.poolings(y1)
             concat_list = [x1] + [y1, y2, self.poolings(y2)]
-            if self.is_tiny_version:
-                x1 = self.fuse_layers(torch.cat(concat_list[::-1], 1))
-            else:
-                x1 = self.fuse_layers(torch.cat(concat_list, 1))
         else:
             concat_list = [x1] + [m(x1) for m in self.poolings]
-            if self.is_tiny_version:
-                x1 = self.fuse_layers(torch.cat(concat_list[::-1], 1))
-            else:
-                x1 = self.fuse_layers(torch.cat(concat_list, 1))
-
+        if self.is_tiny_version:
+            x1 = self.fuse_layers(torch.cat(concat_list[::-1], 1))
+        else:
+            x1 = self.fuse_layers(torch.cat(concat_list, 1))
         x2 = self.short_layer(x)
         return self.final_conv(torch.cat((x1, x2), dim=1))
 
@@ -1152,10 +1136,7 @@ class PPYOLOEBasicBlock(nn.Module):
         """
         y = self.conv1(x)
         y = self.conv2(y)
-        if self.shortcut:
-            return x + y
-        else:
-            return y
+        return x + y if self.shortcut else y
 
 
 class CSPResLayer(nn.Module):
@@ -1342,7 +1323,7 @@ class RepStageBlock(nn.Module):
                 out_channels,
                 block_cfg=block_cfg,
                 adaptive_weight=True)
-            num_blocks = num_blocks // 2
+            num_blocks //= 2
             self.block = None
             if num_blocks > 1:
                 self.block = nn.Sequential(*(BottleRep(

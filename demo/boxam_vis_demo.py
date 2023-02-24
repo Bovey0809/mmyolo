@@ -125,15 +125,14 @@ def parse_args():
         help='Making it much faster of AblationCAM. '
         'The parameter controls how many channels should be ablated')
 
-    args = parser.parse_args()
-    return args
+    return parser.parse_args()
 
 
 def init_detector_and_visualizer(args, cfg):
     max_shape = args.max_shape
     if not isinstance(max_shape, list):
         max_shape = [args.max_shape]
-    assert len(max_shape) == 1 or len(max_shape) == 2
+    assert len(max_shape) in {1, 2}
 
     model_wrapper = BoxAMDetectorWrapper(
         cfg, args.checkpoint, args.score_thr, device=args.device)

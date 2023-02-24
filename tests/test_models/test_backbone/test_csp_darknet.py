@@ -54,8 +54,7 @@ class TestCSPDarknet(TestCase):
         assert check_norm_state(model.modules(), False)
 
         # Test CSPDarknet-P5 forward with widen_factor=0.25
-        model = module_class(
-            arch='P5', widen_factor=0.25, out_indices=range(0, 5))
+        model = module_class(arch='P5', widen_factor=0.25, out_indices=range(5))
         model.train()
 
         imgs = torch.randn(1, 3, 64, 64)
@@ -69,9 +68,8 @@ class TestCSPDarknet(TestCase):
 
         # Test CSPDarknet forward with dict(type='ReLU')
         model = module_class(
-            widen_factor=0.125,
-            act_cfg=dict(type='ReLU'),
-            out_indices=range(0, 5))
+            widen_factor=0.125, act_cfg=dict(type='ReLU'), out_indices=range(5)
+        )
         model.train()
 
         imgs = torch.randn(1, 3, 64, 64)
@@ -84,7 +82,7 @@ class TestCSPDarknet(TestCase):
         assert feat[4].shape == torch.Size((1, 128, 2, 2))
 
         # Test CSPDarknet with BatchNorm forward
-        model = module_class(widen_factor=0.125, out_indices=range(0, 5))
+        model = module_class(widen_factor=0.125, out_indices=range(5))
         for m in model.modules():
             if is_norm(m):
                 assert isinstance(m, _BatchNorm)

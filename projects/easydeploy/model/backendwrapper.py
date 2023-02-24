@@ -166,7 +166,6 @@ class ORTWrapper(torch.nn.Module):
     def __init_bindings(self):
         Binding = namedtuple('Binding', ('name', 'dtype', 'shape'))
         inputs_info = []
-        outputs_info = []
         self.is_dynamic = False
         for i, tensor in enumerate(self.session.get_inputs()):
             if any(not isinstance(i, int) for i in tensor.shape):
@@ -174,9 +173,10 @@ class ORTWrapper(torch.nn.Module):
             inputs_info.append(
                 Binding(tensor.name, tensor.type, tuple(tensor.shape)))
 
-        for i, tensor in enumerate(self.session.get_outputs()):
-            outputs_info.append(
-                Binding(tensor.name, tensor.type, tuple(tensor.shape)))
+        outputs_info = [
+            Binding(tensor.name, tensor.type, tuple(tensor.shape))
+            for tensor in self.session.get_outputs()
+        ]
         self.inputs_info = inputs_info
         self.outputs_info = outputs_info
         self.num_inputs = len(inputs_info)

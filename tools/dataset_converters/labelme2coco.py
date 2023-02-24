@@ -55,8 +55,7 @@ def parse_args():
     parser.add_argument('--out', type=str, help='COCO label json output path')
     parser.add_argument(
         '--class-id-txt', default=None, type=str, help='All class id txt path')
-    args = parser.parse_args()
-    return args
+    return parser.parse_args()
 
 
 def format_coco_annotations(points: list, image_id: int, annotations_id: int,
@@ -72,18 +71,18 @@ def format_coco_annotations(points: list, image_id: int, annotations_id: int,
     Return:
         annotation_info (dict): COCO annotation data.
     """
-    annotation_info = dict()
-    annotation_info['iscrowd'] = 0
-    annotation_info['category_id'] = category_id
-    annotation_info['id'] = annotations_id
-    annotation_info['image_id'] = image_id
-
-    # bbox is [x1, y1, w, h]
-    annotation_info['bbox'] = [
-        points[0][0], points[0][1], points[1][0] - points[0][0],
-        points[1][1] - points[0][1]
-    ]
-
+    annotation_info = {
+        'iscrowd': 0,
+        'category_id': category_id,
+        'id': annotations_id,
+        'image_id': image_id,
+        'bbox': [
+            points[0][0],
+            points[0][1],
+            points[1][0] - points[0][0],
+            points[1][1] - points[0][1],
+        ],
+    }
     annotation_info['area'] = annotation_info['bbox'][2] * annotation_info[
         'bbox'][3]  # bbox w * h
     segmentation_points = np.asarray(points).copy()
@@ -165,7 +164,7 @@ def parse_labelme_to_coco(
     image_id = 0
     annotations_id = 0
     if all_classes_id is None:
-        category_to_id = dict()
+        category_to_id = {}
         categories_labels = []
     else:
         category_to_id = all_classes_id
@@ -275,7 +274,7 @@ def convert_labelme_to_coco(image_dir: str,
     if class_id_txt is not None:
         assert Path(class_id_txt).suffix == '.txt'
 
-        all_classes_id = dict()
+        all_classes_id = {}
         with open(class_id_txt, encoding='utf-8') as f:
             txt_lines = f.read().splitlines()
         assert len(txt_lines) > 0
@@ -290,7 +289,7 @@ def convert_labelme_to_coco(image_dir: str,
                                  ' words, like "1 Big house" -> "1 '
                                  'Big-house".')
             v, k = class_info
-            all_classes_id.update({k: int(v)})
+            all_classes_id[k] = int(v)
     else:
         all_classes_id = None
 

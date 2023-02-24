@@ -90,8 +90,7 @@ class BaseBackbone(BaseModule, metaclass=ABCMeta):
         self.num_stages = len(arch_setting)
         self.arch_setting = arch_setting
 
-        assert set(out_indices).issubset(
-            i for i in range(len(arch_setting) + 1))
+        assert set(out_indices).issubset(iter(range(len(arch_setting) + 1)))
 
         if frozen_stages not in range(-1, len(arch_setting) + 1):
             raise ValueError('"frozen_stages" must be in range(-1, '

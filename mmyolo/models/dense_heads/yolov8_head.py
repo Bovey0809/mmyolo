@@ -408,8 +408,7 @@ class YOLOv8Head(YOLOv5Head):
             Tensor: batch gt instances data, shape [batch_size, number_gt, 5]
         """
         if isinstance(batch_gt_instances, Sequence):
-            max_gt_bbox_len = max(
-                [len(gt_instances) for gt_instances in batch_gt_instances])
+            max_gt_bbox_len = max(len(gt_instances) for gt_instances in batch_gt_instances)
             # fill [-1., 0., 0., 0., 0.] if some shape of
             # single batch not equal max_gt_bbox_len
             batch_instance_list = []
@@ -441,7 +440,6 @@ class YOLOv8Head(YOLOv5Head):
             out = batch_gt_instances.new_zeros((batch_size, counts.max(), 5))
             for j in range(batch_size):
                 matches = i == j
-                n = matches.sum()
-                if n:
+                if n := matches.sum():
                     out[j, :n] = batch_gt_instances[matches, 1:]
             return out

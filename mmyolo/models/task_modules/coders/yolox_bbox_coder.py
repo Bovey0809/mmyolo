@@ -41,5 +41,4 @@ class YOLOXBBoxCoder(BaseBBoxCoder):
         br_x = (xys[..., 0] + whs[..., 0] / 2)
         br_y = (xys[..., 1] + whs[..., 1] / 2)
 
-        decoded_bboxes = torch.stack([tl_x, tl_y, br_x, br_y], -1)
-        return decoded_bboxes
+        return torch.stack([tl_x, tl_y, br_x, br_y], -1)

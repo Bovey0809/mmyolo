@@ -86,13 +86,11 @@ class CSPNeXt(BaseBackbone):
             mode='fan_in',
             nonlinearity='leaky_relu')
     ) -> None:
-        arch_setting = self.arch_settings[arch]
-        if arch_ovewrite:
-            arch_setting = arch_ovewrite
+        arch_setting = arch_ovewrite or self.arch_settings[arch]
         self.channel_attention = channel_attention
         self.use_depthwise = use_depthwise
         self.conv = DepthwiseSeparableConvModule \
-            if use_depthwise else ConvModule
+                if use_depthwise else ConvModule
         self.expand_ratio = expand_ratio
         self.conv_cfg = conv_cfg
 
@@ -111,7 +109,7 @@ class CSPNeXt(BaseBackbone):
 
     def build_stem_layer(self) -> nn.Module:
         """Build a stem layer."""
-        stem = nn.Sequential(
+        return nn.Sequential(
             ConvModule(
                 3,
                 int(self.arch_setting[0][0] * self.widen_factor // 2),
@@ -119,7 +117,8 @@ class CSPNeXt(BaseBackbone):
                 padding=1,
                 stride=2,
                 norm_cfg=self.norm_cfg,
-                act_cfg=self.act_cfg),
+                act_cfg=self.act_cfg,
+            ),
             ConvModule(
                 int(self.arch_setting[0][0] * self.widen_factor // 2),
                 int(self.arch_setting[0][0] * self.widen_factor // 2),
@@ -127,7 +126,8 @@ class CSPNeXt(BaseBackbone):
                 padding=1,
                 stride=1,
                 norm_cfg=self.norm_cfg,
-                act_cfg=self.act_cfg),
+                act_cfg=self.act_cfg,
+            ),
             ConvModule(
                 int(self.arch_setting[0][0] * self.widen_factor // 2),
                 int(self.arch_setting[0][0] * self.widen_factor),
@@ -135,8 +135,9 @@ class CSPNeXt(BaseBackbone):
                 padding=1,
                 stride=1,
                 norm_cfg=self.norm_cfg,
-                act_cfg=self.act_cfg))
-        return stem
+                act_cfg=self.act_cfg,
+            ),
+        )
 
     def build_stage_layer(self, stage_idx: int, setting: list) -> list:
         """Build a stage layer.
@@ -151,7 +152,6 @@ class CSPNeXt(BaseBackbone):
         out_channels = int(out_channels * self.widen_factor)
         num_blocks = max(round(num_blocks * self.deepen_factor), 1)
 
-        stage = []
         conv_layer = self.conv(
             in_channels,
             out_channels,
@@ -161,7 +161,7 @@ class CSPNeXt(BaseBackbone):
             conv_cfg=self.conv_cfg,
             norm_cfg=self.norm_cfg,
             act_cfg=self.act_cfg)
-        stage.append(conv_layer)
+        stage = [conv_layer]
         if use_spp:
             spp = SPPFBottleneck(
                 out_channels,

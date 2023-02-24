@@ -75,17 +75,17 @@ class YOLOv5PAFPN(BaseYOLONeck):
         Returns:
             nn.Module: The reduce layer.
         """
-        if idx == len(self.in_channels) - 1:
-            layer = ConvModule(
+        return (
+            ConvModule(
                 make_divisible(self.in_channels[idx], self.widen_factor),
                 make_divisible(self.in_channels[idx - 1], self.widen_factor),
                 1,
                 norm_cfg=self.norm_cfg,
-                act_cfg=self.act_cfg)
-        else:
-            layer = nn.Identity()
-
-        return layer
+                act_cfg=self.act_cfg,
+            )
+            if idx == len(self.in_channels) - 1
+            else nn.Identity()
+        )
 
     def build_upsample_layer(self, *args, **kwargs) -> nn.Module:
         """build upsample layer."""

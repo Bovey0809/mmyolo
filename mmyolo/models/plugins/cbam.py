@@ -33,26 +33,28 @@ class ChannelAttention(BaseModule):
         self.fc = nn.Sequential(
             ConvModule(
                 in_channels=channels,
-                out_channels=int(channels / reduce_ratio),
+                out_channels=channels // reduce_ratio,
                 kernel_size=1,
                 stride=1,
                 conv_cfg=None,
-                act_cfg=act_cfg),
+                act_cfg=act_cfg,
+            ),
             ConvModule(
-                in_channels=int(channels / reduce_ratio),
+                in_channels=channels // reduce_ratio,
                 out_channels=channels,
                 kernel_size=1,
                 stride=1,
                 conv_cfg=None,
-                act_cfg=None))
+                act_cfg=None,
+            ),
+        )
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward function."""
         avgpool_out = self.fc(self.avg_pool(x))
         maxpool_out = self.fc(self.max_pool(x))
-        out = self.sigmoid(avgpool_out + maxpool_out)
-        return out
+        return self.sigmoid(avgpool_out + maxpool_out)
 
 
 class SpatialAttention(BaseModule):

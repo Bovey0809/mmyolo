@@ -28,8 +28,7 @@ def parse_args():
         help='delete the download zipped files')
     parser.add_argument(
         '--threads', type=int, help='number of threading', default=4)
-    args = parser.parse_args()
-    return args
+    return parser.parse_args()
 
 
 def download(url, dir, unzip=True, delete=False, threads=1):
@@ -96,7 +95,7 @@ def main():
             'https://download.openmmlab.com/mmyolo/data/cat_dataset.zip'  # noqa
         ],
     )
-    url = data2url.get(args.dataset_name, None)
+    url = data2url.get(args.dataset_name)
     if url is None:
         print('Only support COCO, VOC, balloon, cat and LVIS now!')
         return

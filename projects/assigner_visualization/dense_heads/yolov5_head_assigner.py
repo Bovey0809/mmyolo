@@ -56,23 +56,26 @@ class YOLOv5HeadAssigner(YOLOv5Head):
 
             # empty gt bboxes
             if batch_targets_normed.shape[1] == 0:
-                for k in range(self.num_base_priors):
-                    assign_results_feat.append({
-                        'stride':
-                        self.featmap_strides[i],
-                        'grid_x_inds':
-                        torch.zeros([0], dtype=torch.int64).to(device),
-                        'grid_y_inds':
-                        torch.zeros([0], dtype=torch.int64).to(device),
-                        'img_inds':
-                        torch.zeros([0], dtype=torch.int64).to(device),
-                        'class_inds':
-                        torch.zeros([0], dtype=torch.int64).to(device),
-                        'retained_gt_inds':
-                        torch.zeros([0], dtype=torch.int64).to(device),
-                        'prior_ind':
-                        k
-                    })
+                assign_results_feat.extend(
+                    {
+                        'stride': self.featmap_strides[i],
+                        'grid_x_inds': torch.zeros([0], dtype=torch.int64).to(
+                            device
+                        ),
+                        'grid_y_inds': torch.zeros([0], dtype=torch.int64).to(
+                            device
+                        ),
+                        'img_inds': torch.zeros([0], dtype=torch.int64).to(device),
+                        'class_inds': torch.zeros([0], dtype=torch.int64).to(
+                            device
+                        ),
+                        'retained_gt_inds': torch.zeros([0], dtype=torch.int64).to(
+                            device
+                        ),
+                        'prior_ind': k,
+                    }
+                    for k in range(self.num_base_priors)
+                )
                 assign_results.append(assign_results_feat)
                 continue
 
@@ -93,23 +96,26 @@ class YOLOv5HeadAssigner(YOLOv5Head):
 
             # no gt bbox matches anchor
             if batch_targets_scaled.shape[0] == 0:
-                for k in range(self.num_base_priors):
-                    assign_results_feat.append({
-                        'stride':
-                        self.featmap_strides[i],
-                        'grid_x_inds':
-                        torch.zeros([0], dtype=torch.int64).to(device),
-                        'grid_y_inds':
-                        torch.zeros([0], dtype=torch.int64).to(device),
-                        'img_inds':
-                        torch.zeros([0], dtype=torch.int64).to(device),
-                        'class_inds':
-                        torch.zeros([0], dtype=torch.int64).to(device),
-                        'retained_gt_inds':
-                        torch.zeros([0], dtype=torch.int64).to(device),
-                        'prior_ind':
-                        k
-                    })
+                assign_results_feat.extend(
+                    {
+                        'stride': self.featmap_strides[i],
+                        'grid_x_inds': torch.zeros([0], dtype=torch.int64).to(
+                            device
+                        ),
+                        'grid_y_inds': torch.zeros([0], dtype=torch.int64).to(
+                            device
+                        ),
+                        'img_inds': torch.zeros([0], dtype=torch.int64).to(device),
+                        'class_inds': torch.zeros([0], dtype=torch.int64).to(
+                            device
+                        ),
+                        'retained_gt_inds': torch.zeros([0], dtype=torch.int64).to(
+                            device
+                        ),
+                        'prior_ind': k,
+                    }
+                    for k in range(self.num_base_priors)
+                )
                 assign_results.append(assign_results_feat)
                 continue
 
@@ -183,6 +189,4 @@ class YOLOv5HeadAssigner(YOLOv5Head):
             # Fast version
             assign_inputs = (batch_data_samples['bboxes_labels'],
                              batch_data_samples['img_metas'], inputs_hw)
-        assign_results = self.assign_by_gt_and_feat(*assign_inputs)
-
-        return assign_results
+        return self.assign_by_gt_and_feat(*assign_inputs)

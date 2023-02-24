@@ -25,8 +25,7 @@ def get_prior_xy_info(index: int, num_base_priors: int,
                       featmap_sizes: int) -> Tuple[int, int, int]:
     """Get prior index and xy index in feature map by flatten index."""
     _, featmap_w = featmap_sizes
-    priors = index % num_base_priors
-    xy_index = index // num_base_priors
+    xy_index, priors = divmod(index, num_base_priors)
     grid_y = xy_index // featmap_w
     grid_x = xy_index % featmap_w
     return priors, grid_x, grid_y
@@ -373,11 +372,7 @@ class YOLOv5Head(BaseDenseHead):
                               flatten_objectness, batch_img_metas):
             ori_shape = img_meta['ori_shape']
             scale_factor = img_meta['scale_factor']
-            if 'pad_param' in img_meta:
-                pad_param = img_meta['pad_param']
-            else:
-                pad_param = None
-
+            pad_param = img_meta['pad_param'] if 'pad_param' in img_meta else None
             score_thr = cfg.get('score_thr', -1)
             # yolox_style does not require the following operations
             if objectness is not None and score_thr > 0 and not cfg.get(
@@ -400,7 +395,7 @@ class YOLOv5Head(BaseDenseHead):
                 continue
 
             nms_pre = cfg.get('nms_pre', 100000)
-            if cfg.multi_label is False:
+            if not cfg.multi_label:
                 scores, labels = scores.max(1, keepdim=True)
                 scores, _, keep_idxs, results = filter_scores_and_topk(
                     scores,
@@ -456,15 +451,12 @@ class YOLOv5Head(BaseDenseHead):
         """
 
         if isinstance(batch_data_samples, list):
-            losses = super().loss(x, batch_data_samples)
-        else:
-            outs = self(x)
-            # Fast version
-            loss_inputs = outs + (batch_data_samples['bboxes_labels'],
-                                  batch_data_samples['img_metas'])
-            losses = self.loss_by_feat(*loss_inputs)
-
-        return losses
+            return super().loss(x, batch_data_samples)
+        outs = self(x)
+        # Fast version
+        loss_inputs = outs + (batch_data_samples['bboxes_labels'],
+                              batch_data_samples['img_metas'])
+        return self.loss_by_feat(*loss_inputs)
 
     def loss_by_feat(
             self,
@@ -691,8 +683,7 @@ class YOLOv5Head(BaseDenseHead):
         bbox_pred = bbox_pred.sigmoid()
         pred_xy = bbox_pred[:, :2] * 2 - 0.5
         pred_wh = (bbox_pred[:, 2:] * 2)**2 * priors_base_sizes
-        decoded_bbox_pred = torch.cat((pred_xy, pred_wh), dim=-1)
-        return decoded_bbox_pred
+        return torch.cat((pred_xy, pred_wh), dim=-1)
 
     def _loss_by_feat_with_ignore(
             self, cls_scores: Sequence[Tensor], bbox_preds: Sequence[Tensor],

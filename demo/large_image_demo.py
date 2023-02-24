@@ -83,8 +83,7 @@ def parse_args():
         action='store_true',
         help='Save the results of each patch. '
         'The `--debug` must be enabled.')
-    args = parser.parse_args()
-    return args
+    return parser.parse_args()
 
 
 def main():
@@ -134,10 +133,7 @@ def main():
         while True:
             # prepare batch slices
             end = min(start + args.batch_size, len(sliced_image_object))
-            images = []
-            for sliced_image in sliced_image_object.images[start:end]:
-                images.append(sliced_image)
-
+            images = list(sliced_image_object.images[start:end])
             # forward the model
             slice_results.extend(inference_detector(model, images))
 
@@ -165,7 +161,7 @@ def main():
             merged_result = slice_results[0].clone()
             merged_result.pred_instances = shifted_instances
 
-            debug_file_name = name + '_debug' + suffix
+            debug_file_name = f'{name}_debug{suffix}'
             debug_out_file = None if args.show else os.path.join(
                 args.out_dir, debug_file_name)
             visualizer.set_image(img.copy())

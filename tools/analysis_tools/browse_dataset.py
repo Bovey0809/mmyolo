@@ -72,8 +72,7 @@ def parse_args():
         'It also allows nested list/tuple values, e.g. key="[(a,b),(c,d)]" '
         'Note that the quotation marks are necessary and that no white space '
         'is allowed.')
-    args = parser.parse_args()
-    return args
+    return parser.parse_args()
 
 
 def _get_adaptive_scale(img_shape: Tuple[int, int],
@@ -122,7 +121,7 @@ def make_grid(imgs, names):
             pad_width,
             cv2.BORDER_CONSTANT,
             value=(255, 255, 255))
-        texts.append(f'{"execution: "}{i}\n{names[i]}\n{ori_shapes[i]}')
+        texts.append(f'execution: {i}\n{names[i]}\n{ori_shapes[i]}')
         text_positions.append(
             [start_x + img.shape[1] // 2 + pad_width, max_height])
         start_x += img.shape[1] + horizontal_gap
@@ -162,7 +161,7 @@ class InspectCompose(Compose):
         for t in self.ptransforms:
             data = t(data)
             # Keep the same meta_keys in the PackDetInputs
-            self.transforms[-1].meta_keys = [key for key in data]
+            self.transforms[-1].meta_keys = list(data)
             data_sample = self.transforms[-1](data)
             if data is None:
                 return None
@@ -185,7 +184,7 @@ def main():
     # register all modules in mmyolo into the registries
     register_all_modules()
 
-    dataset_cfg = cfg.get(args.phase + '_dataloader').get('dataset')
+    dataset_cfg = cfg.get(f'{args.phase}_dataloader').get('dataset')
     dataset = DATASETS.build(dataset_cfg)
     visualizer = VISUALIZERS.build(cfg.visualizer)
     visualizer.dataset_meta = dataset.metainfo
@@ -236,8 +235,9 @@ def main():
         elif args.mode == 'transformed':
             image = image_i[-1]
         else:
-            image = make_grid([result for result in image_i],
-                              [result['name'] for result in intermediate_imgs])
+            image = make_grid(
+                list(image_i), [result['name'] for result in intermediate_imgs]
+            )
 
         if hasattr(datasample, 'img_path'):
             filename = osp.basename(datasample.img_path)

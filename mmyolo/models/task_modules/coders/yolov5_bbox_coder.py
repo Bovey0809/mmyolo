@@ -47,9 +47,12 @@ class YOLOv5BBoxCoder(BaseBBoxCoder):
         w_pred = (pred_bboxes[..., 2] * 2)**2 * w
         h_pred = (pred_bboxes[..., 3] * 2)**2 * h
 
-        decoded_bboxes = torch.stack(
-            (x_center_pred - w_pred / 2, y_center_pred - h_pred / 2,
-             x_center_pred + w_pred / 2, y_center_pred + h_pred / 2),
-            dim=-1)
-
-        return decoded_bboxes
+        return torch.stack(
+            (
+                x_center_pred - w_pred / 2,
+                y_center_pred - h_pred / 2,
+                x_center_pred + w_pred / 2,
+                y_center_pred + h_pred / 2,
+            ),
+            dim=-1,
+        )

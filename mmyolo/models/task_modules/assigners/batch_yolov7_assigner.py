@@ -11,10 +11,7 @@ def _cat_multi_level_tensor_in_place(*multi_level_tensor, place_hold_var):
     """concat multi-level tensor in place."""
     for level_tensor in multi_level_tensor:
         for i, var in enumerate(level_tensor):
-            if len(var) > 0:
-                level_tensor[i] = torch.cat(var, dim=0)
-            else:
-                level_tensor[i] = place_hold_var
+            level_tensor[i] = torch.cat(var, dim=0) if len(var) > 0 else place_hold_var
 
 
 class BatchYOLOv7Assigner(nn.Module):
@@ -232,7 +229,7 @@ class BatchYOLOv7Assigner(nn.Module):
 
                 # (n,85)
                 level_batch_idx, prior_ind, \
-                    grid_x, grid_y = _mlvl_positive_info.T
+                        grid_x, grid_y = _mlvl_positive_info.T
                 pred_positive = head_pred[level_batch_idx, prior_ind, grid_y,
                                           grid_x]
                 _mlvl_obj_cls.append(pred_positive[:, 4:])
@@ -242,12 +239,12 @@ class BatchYOLOv7Assigner(nn.Module):
                 pred_positive_cxcy = (pred_positive[:, :2].sigmoid() * 2. -
                                       0.5 + grid) * self.featmap_strides[i]
                 pred_positive_wh = (pred_positive[:, 2:4].sigmoid() * 2) ** 2 \
-                    * priors * self.featmap_strides[i]
+                        * priors * self.featmap_strides[i]
                 pred_positive_xywh = torch.cat(
                     [pred_positive_cxcy, pred_positive_wh], dim=-1)
                 _mlvl_decoderd_bboxes.append(pred_positive_xywh)
 
-            if len(_mlvl_decoderd_bboxes) == 0:
+            if not _mlvl_decoderd_bboxes:
                 continue
 
             # 1 calc pair_wise_iou_loss
@@ -280,10 +277,10 @@ class BatchYOLOv7Assigner(nn.Module):
                               1, num_pred_positive, 1))
             # cls_score * obj
             cls_preds_ = _mlvl_obj_cls[:, 1:]\
-                .unsqueeze(0)\
-                .repeat(num_gts, 1, 1) \
-                * _mlvl_obj_cls[:, 0:1]\
-                .unsqueeze(0).repeat(num_gts, 1, 1)
+                    .unsqueeze(0)\
+                    .repeat(num_gts, 1, 1) \
+                    * _mlvl_obj_cls[:, 0:1]\
+                    .unsqueeze(0).repeat(num_gts, 1, 1)
             y = cls_preds_.sqrt_()
             pair_wise_cls_loss = F.binary_cross_entropy_with_logits(
                 torch.log(y / (1 - y)), gt_cls_per_image,
@@ -338,7 +335,8 @@ class BatchYOLOv7Assigner(nn.Module):
                 mlvl_targets_normed_matched[i].append(
                     targets_normed[layer_idx])
 
-        results = mlvl_positive_infos_matched, \
-            mlvl_priors_matched, \
-            mlvl_targets_normed_matched
-        return results
+        return (
+            mlvl_positive_infos_matched,
+            mlvl_priors_matched,
+            mlvl_targets_normed_matched,
+        )

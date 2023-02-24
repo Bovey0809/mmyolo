@@ -32,8 +32,8 @@ def _process_data(args,
                   in_dataset_type: str,
                   out_dataset_type: str,
                   year: str = '2017'):
-    assert in_dataset_type in ('train', 'val')
-    assert out_dataset_type in ('train', 'val')
+    assert in_dataset_type in {'train', 'val'}
+    assert out_dataset_type in {'train', 'val'}
 
     int_ann_file_name = f'annotations/instances_{in_dataset_type}{year}.json'
     out_ann_file_name = f'annotations/instances_{out_dataset_type}{year}.json'
@@ -129,8 +129,7 @@ def parse_args():
         'The training subset is extracted from the validation set by '
         'default which can speed up.')
     parser.add_argument('--seed', default=-1, type=int, help='seed')
-    args = parser.parse_args()
-    return args
+    return parser.parse_args()
 
 
 def main():

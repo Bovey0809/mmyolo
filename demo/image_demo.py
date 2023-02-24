@@ -40,8 +40,7 @@ def parse_args():
         '--to-labelme',
         action='store_true',
         help='Output labelme style label file')
-    args = parser.parse_args()
-    return args
+    return parser.parse_args()
 
 
 def main():

@@ -18,7 +18,7 @@ def show_coco_json(args):
     categories = coco.loadCats(coco.getCatIds())
     category_names = [category['name'] for category in categories]
     print(f'Total number of Categories : {len(category_names)}')
-    print('Categories: \n{}\n'.format(' '.join(category_names)))
+    print(f"Categories: \n{' '.join(category_names)}\n")
 
     if args.category_names is None:
         category_ids = []
@@ -71,10 +71,10 @@ def show_bbox_only(coco, anns, show_label_bbox=True, is_filling=True):
     ax = plt.gca()
     ax.set_autoscale_on(False)
 
-    image2color = dict()
-    for cat in coco.getCatIds():
-        image2color[cat] = (np.random.random((1, 3)) * 0.7 + 0.3).tolist()[0]
-
+    image2color = {
+        cat: (np.random.random((1, 3)) * 0.7 + 0.3).tolist()[0]
+        for cat in coco.getCatIds()
+    }
     polygons = []
     colors = []
 
@@ -86,17 +86,14 @@ def show_bbox_only(coco, anns, show_label_bbox=True, is_filling=True):
         polygons.append(Polygon(np.array(poly).reshape((4, 2))))
         colors.append(color)
 
-        if show_label_bbox:
-            label_bbox = dict(facecolor=color)
-        else:
-            label_bbox = None
-
+        label_bbox = dict(facecolor=color) if show_label_bbox else None
         ax.text(
             bbox_x,
             bbox_y,
-            '%s' % (coco.loadCats(ann['category_id'])[0]['name']),
+            f"{coco.loadCats(ann['category_id'])[0]['name']}",
             color='white',
-            bbox=label_bbox)
+            bbox=label_bbox,
+        )
 
     if is_filling:
         p = PatchCollection(
@@ -134,8 +131,7 @@ def parse_args():
         '--shuffle',
         action='store_true',
         help='Whether to display in disorder')
-    args = parser.parse_args()
-    return args
+    return parser.parse_args()
 
 
 def main():

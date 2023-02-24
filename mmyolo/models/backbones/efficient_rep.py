@@ -132,12 +132,9 @@ class YOLOv6EfficientRep(BaseBackbone):
                 out_channels=out_channels,
                 kernel_size=3,
                 stride=2))
-        stage = []
-
         ef_block = nn.Sequential(MODELS.build(block_cfg), rep_stage_block)
 
-        stage.append(ef_block)
-
+        stage = [ef_block]
         if use_spp:
             spp = SPPFBottleneck(
                 in_channels=out_channels,
@@ -270,12 +267,9 @@ class YOLOv6CSPBep(YOLOv6EfficientRep):
                 out_channels=out_channels,
                 kernel_size=3,
                 stride=2))
-        stage = []
-
         ef_block = nn.Sequential(MODELS.build(block_cfg), rep_stage_block)
 
-        stage.append(ef_block)
-
+        stage = [ef_block]
         if use_spp:
             spp = SPPFBottleneck(
                 in_channels=out_channels,

@@ -58,10 +58,7 @@ class BaseMixImageTransform(BaseTransform, metaclass=ABCMeta):
         self.random_pop = random_pop
         self.results_cache = []
 
-        if pre_transform is None:
-            self.pre_transform = None
-        else:
-            self.pre_transform = Compose(pre_transform)
+        self.pre_transform = None if pre_transform is None else Compose(pre_transform)
 
     @abstractmethod
     def get_indexes(self, dataset: Union[BaseDataset,
@@ -301,8 +298,7 @@ class Mosaic(BaseMixImageTransform):
         Returns:
             list: indexes.
         """
-        indexes = [random.randint(0, len(dataset)) for _ in range(3)]
-        return indexes
+        return [random.randint(0, len(dataset)) for _ in range(3)]
 
     def mix_img_transform(self, results: dict) -> dict:
         """Mixed image data transformation.
@@ -337,11 +333,7 @@ class Mosaic(BaseMixImageTransform):
 
         loc_strs = ('top_left', 'top_right', 'bottom_left', 'bottom_right')
         for i, loc in enumerate(loc_strs):
-            if loc == 'top_left':
-                results_patch = results
-            else:
-                results_patch = results['mix_results'][i - 1]
-
+            results_patch = results if loc == 'top_left' else results['mix_results'][i - 1]
             img_i = results_patch['img']
             h_i, w_i = img_i.shape[:2]
             # keep_ratio resize
@@ -411,43 +403,43 @@ class Mosaic(BaseMixImageTransform):
                 - paste_coord (tuple): paste corner coordinate in mosaic image.
                 - crop_coord (tuple): crop corner coordinate in mosaic image.
         """
-        assert loc in ('top_left', 'top_right', 'bottom_left', 'bottom_right')
-        if loc == 'top_left':
+        assert loc in {'top_left', 'top_right', 'bottom_left', 'bottom_right'}
+        if loc == 'bottom_left':
+            # index2 to bottom left part of image
+            x1, y1, x2, y2 = max(center_position_xy[0] - img_shape_wh[0], 0), \
+                                 center_position_xy[1], \
+                                 center_position_xy[0], \
+                                 min(self.img_scale[1] * 2, center_position_xy[1] +
+                                 img_shape_wh[1])
+            crop_coord = img_shape_wh[0] - (x2 - x1), 0, img_shape_wh[0], min(
+                y2 - y1, img_shape_wh[1])
+
+        elif loc == 'top_left':
             # index0 to top left part of image
             x1, y1, x2, y2 = max(center_position_xy[0] - img_shape_wh[0], 0), \
-                             max(center_position_xy[1] - img_shape_wh[1], 0), \
-                             center_position_xy[0], \
-                             center_position_xy[1]
+                                 max(center_position_xy[1] - img_shape_wh[1], 0), \
+                                 center_position_xy[0], \
+                                 center_position_xy[1]
             crop_coord = img_shape_wh[0] - (x2 - x1), img_shape_wh[1] - (
                 y2 - y1), img_shape_wh[0], img_shape_wh[1]
 
         elif loc == 'top_right':
             # index1 to top right part of image
             x1, y1, x2, y2 = center_position_xy[0], \
-                             max(center_position_xy[1] - img_shape_wh[1], 0), \
-                             min(center_position_xy[0] + img_shape_wh[0],
+                                 max(center_position_xy[1] - img_shape_wh[1], 0), \
+                                 min(center_position_xy[0] + img_shape_wh[0],
                                  self.img_scale[0] * 2), \
-                             center_position_xy[1]
+                                 center_position_xy[1]
             crop_coord = 0, img_shape_wh[1] - (y2 - y1), min(
                 img_shape_wh[0], x2 - x1), img_shape_wh[1]
-
-        elif loc == 'bottom_left':
-            # index2 to bottom left part of image
-            x1, y1, x2, y2 = max(center_position_xy[0] - img_shape_wh[0], 0), \
-                             center_position_xy[1], \
-                             center_position_xy[0], \
-                             min(self.img_scale[1] * 2, center_position_xy[1] +
-                                 img_shape_wh[1])
-            crop_coord = img_shape_wh[0] - (x2 - x1), 0, img_shape_wh[0], min(
-                y2 - y1, img_shape_wh[1])
 
         else:
             # index3 to bottom right part of image
             x1, y1, x2, y2 = center_position_xy[0], \
-                             center_position_xy[1], \
-                             min(center_position_xy[0] + img_shape_wh[0],
+                                 center_position_xy[1], \
+                                 min(center_position_xy[0] + img_shape_wh[0],
                                  self.img_scale[0] * 2), \
-                             min(self.img_scale[1] * 2, center_position_xy[1] +
+                                 min(self.img_scale[1] * 2, center_position_xy[1] +
                                  img_shape_wh[1])
             crop_coord = 0, 0, min(img_shape_wh[0],
                                    x2 - x1), min(y2 - y1, img_shape_wh[1])
@@ -586,8 +578,7 @@ class Mosaic9(BaseMixImageTransform):
         Returns:
             list: indexes.
         """
-        indexes = [random.randint(0, len(dataset)) for _ in range(8)]
-        return indexes
+        return [random.randint(0, len(dataset)) for _ in range(8)]
 
     def mix_img_transform(self, results: dict) -> dict:
         """Mixed image data transformation.
@@ -687,8 +678,17 @@ class Mosaic9(BaseMixImageTransform):
         Returns:
              paste_coord (tuple): paste corner coordinate in mosaic image.
         """
-        assert loc in ('center', 'top', 'top_right', 'right', 'bottom_right',
-                       'bottom', 'bottom_left', 'left', 'top_left')
+        assert loc in {
+            'center',
+            'top',
+            'top_right',
+            'right',
+            'bottom_right',
+            'bottom',
+            'bottom_left',
+            'left',
+            'top_left',
+        }
 
         img_scale_w, img_scale_h = self.img_scale
 
@@ -697,56 +697,56 @@ class Mosaic9(BaseMixImageTransform):
         previous_img_h, previous_img_w = self._previous_img_shape
         center_img_h, center_img_w = self._center_img_shape
 
-        if loc == 'center':
+        if loc == 'bottom':
+            paste_coord = img_scale_w + center_img_w - current_img_w, \
+                              img_scale_h + center_img_h, \
+                              img_scale_w + center_img_w, \
+                              img_scale_h + center_img_h + current_img_h
+        elif loc == 'bottom_left':
+            paste_coord = img_scale_w + center_img_w - \
+                              previous_img_w - current_img_w, \
+                              img_scale_h + center_img_h, \
+                              img_scale_w + center_img_w - previous_img_w, \
+                              img_scale_h + center_img_h + current_img_h
+        elif loc == 'bottom_right':
+            paste_coord = img_scale_w + center_img_w, \
+                              img_scale_h + previous_img_h, \
+                              img_scale_w + center_img_w + current_img_w, \
+                              img_scale_h + previous_img_h + current_img_h
+        elif loc == 'center':
             self._center_img_shape = self._current_img_shape
             #  xmin, ymin, xmax, ymax
             paste_coord = img_scale_w, \
-                img_scale_h, \
-                img_scale_w + current_img_w, \
-                img_scale_h + current_img_h
-        elif loc == 'top':
-            paste_coord = img_scale_w, \
-                          img_scale_h - current_img_h, \
-                          img_scale_w + current_img_w, \
-                          img_scale_h
-        elif loc == 'top_right':
-            paste_coord = img_scale_w + previous_img_w, \
-                          img_scale_h - current_img_h, \
-                          img_scale_w + previous_img_w + current_img_w, \
-                          img_scale_h
-        elif loc == 'right':
-            paste_coord = img_scale_w + center_img_w, \
-                          img_scale_h, \
-                          img_scale_w + center_img_w + current_img_w, \
-                          img_scale_h + current_img_h
-        elif loc == 'bottom_right':
-            paste_coord = img_scale_w + center_img_w, \
-                          img_scale_h + previous_img_h, \
-                          img_scale_w + center_img_w + current_img_w, \
-                          img_scale_h + previous_img_h + current_img_h
-        elif loc == 'bottom':
-            paste_coord = img_scale_w + center_img_w - current_img_w, \
-                          img_scale_h + center_img_h, \
-                          img_scale_w + center_img_w, \
-                          img_scale_h + center_img_h + current_img_h
-        elif loc == 'bottom_left':
-            paste_coord = img_scale_w + center_img_w - \
-                          previous_img_w - current_img_w, \
-                          img_scale_h + center_img_h, \
-                          img_scale_w + center_img_w - previous_img_w, \
-                          img_scale_h + center_img_h + current_img_h
+                    img_scale_h, \
+                    img_scale_w + current_img_w, \
+                    img_scale_h + current_img_h
         elif loc == 'left':
             paste_coord = img_scale_w - current_img_w, \
-                          img_scale_h + center_img_h - current_img_h, \
-                          img_scale_w, \
-                          img_scale_h + center_img_h
+                              img_scale_h + center_img_h - current_img_h, \
+                              img_scale_w, \
+                              img_scale_h + center_img_h
+        elif loc == 'right':
+            paste_coord = img_scale_w + center_img_w, \
+                              img_scale_h, \
+                              img_scale_w + center_img_w + current_img_w, \
+                              img_scale_h + current_img_h
+        elif loc == 'top':
+            paste_coord = img_scale_w, \
+                              img_scale_h - current_img_h, \
+                              img_scale_w + current_img_w, \
+                              img_scale_h
         elif loc == 'top_left':
             paste_coord = img_scale_w - current_img_w, \
-                          img_scale_h + center_img_h - \
-                          previous_img_h - current_img_h, \
-                          img_scale_w, \
-                          img_scale_h + center_img_h - previous_img_h
+                              img_scale_h + center_img_h - \
+                              previous_img_h - current_img_h, \
+                              img_scale_w, \
+                              img_scale_h + center_img_h - previous_img_h
 
+        elif loc == 'top_right':
+            paste_coord = img_scale_w + previous_img_w, \
+                              img_scale_h - current_img_h, \
+                              img_scale_w + previous_img_w + current_img_w, \
+                              img_scale_h
         self._previous_img_shape = self._current_img_shape
         #  xmin, ymin, xmax, ymax
         return paste_coord

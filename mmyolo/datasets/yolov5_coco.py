@@ -47,12 +47,11 @@ class BatchShapePolicyDataset(BaseDetDataset):
     def prepare_data(self, idx: int) -> Any:
         """Pass the dataset to the pipeline during training to support mixed
         data augmentation, such as Mosaic and MixUp."""
-        if self.test_mode is False:
-            data_info = self.get_data_info(idx)
-            data_info['dataset'] = self
-            return self.pipeline(data_info)
-        else:
+        if self.test_mode is not False:
             return super().prepare_data(idx)
+        data_info = self.get_data_info(idx)
+        data_info['dataset'] = self
+        return self.pipeline(data_info)
 
 
 @DATASETS.register_module()

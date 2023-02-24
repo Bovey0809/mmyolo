@@ -61,12 +61,12 @@ def process_checkpoint(in_file, out_file):
 
 
 def is_by_epoch(config):
-    cfg = Config.fromfile('./configs/' + config)
+    cfg = Config.fromfile(f'./configs/{config}')
     return cfg.train_cfg.type == 'EpochBasedTrainLoop'
 
 
 def get_final_epoch_or_iter(config):
-    cfg = Config.fromfile('./configs/' + config)
+    cfg = Config.fromfile(f'./configs/{config}')
     if cfg.train_cfg.type == 'EpochBasedTrainLoop':
         return cfg.train_cfg.max_epochs
     else:
@@ -83,10 +83,9 @@ def get_best_epoch_or_iter(exp_dir):
 
 
 def get_real_epoch_or_iter(config):
-    cfg = Config.fromfile('./configs/' + config)
+    cfg = Config.fromfile(f'./configs/{config}')
     if cfg.train_cfg.type == 'EpochBasedTrainLoop':
-        epoch = cfg.train_cfg.max_epochs
-        return epoch
+        return cfg.train_cfg.max_epochs
     else:
         return cfg.runner.max_iters
 
@@ -95,12 +94,10 @@ def get_final_results(log_json_path,
                       epoch_or_iter,
                       results_lut='coco/bbox_mAP',
                       by_epoch=True):
-    result_dict = dict()
     with open(log_json_path) as f:
         r = f.readlines()[-1]
         last_metric = r.split(',')[0].split(': ')[-1].strip()
-    result_dict[results_lut] = last_metric
-    return result_dict
+    return {results_lut: last_metric}
 
 
 def get_dataset_name(config):
@@ -118,7 +115,7 @@ def get_dataset_name(config):
         WIDERFaceDataset='WIDER Face',
         OpenImagesDataset='OpenImagesDataset',
         OpenImagesChallengeDataset='OpenImagesChallengeDataset')
-    cfg = Config.fromfile('./configs/' + config)
+    cfg = Config.fromfile(f'./configs/{config}')
     return name_map[cfg.dataset_type]
 
 
@@ -178,9 +175,7 @@ def convert_model_info_to_pwc(model_infos):
                     Metrics={'PQ': metric}))
         pwc_model_info['Results'] = results
 
-        link_string = 'https://download.openmmlab.com/mmyolo/v0/'
-        link_string += '{}/{}'.format(model['config'].rstrip('.py'),
-                                      osp.split(model['model_path'])[-1])
+        link_string = f"https://download.openmmlab.com/mmyolo/v0/{model['config'].rstrip('.py')}/{osp.split(model['model_path'])[-1]}"
         pwc_model_info['Weights'] = link_string
         if cfg_folder_name in pwc_files:
             pwc_files[cfg_folder_name].append(pwc_model_info)
@@ -202,8 +197,7 @@ def parse_args():
         action='store_true',
         help='whether to gather the best model.')
 
-    args = parser.parse_args()
-    return args
+    return parser.parse_args()
 
 
 # TODO: Refine
@@ -216,11 +210,11 @@ def main():
     # find all models in the root directory to be gathered
     raw_configs = list(scandir('./configs', '.py', recursive=True))
 
-    # filter configs that is not trained in the experiments dir
-    used_configs = []
-    for raw_config in raw_configs:
-        if osp.exists(osp.join(models_root, raw_config)):
-            used_configs.append(raw_config)
+    used_configs = [
+        raw_config
+        for raw_config in raw_configs
+        if osp.exists(osp.join(models_root, raw_config))
+    ]
     print(f'Find {len(used_configs)} models to be gathered')
 
     # find final_ckpt and log file for trained each config
@@ -234,8 +228,7 @@ def main():
             final_model, final_epoch_or_iter = get_best_epoch_or_iter(exp_dir)
         else:
             final_epoch_or_iter = get_final_epoch_or_iter(used_config)
-            final_model = '{}_{}.pth'.format('epoch' if by_epoch else 'iter',
-                                             final_epoch_or_iter)
+            final_model = f"{'epoch' if by_epoch else 'iter'}_{final_epoch_or_iter}.pth"
 
         model_path = osp.join(exp_dir, final_model)
         # skip if the model is still training
@@ -244,8 +237,9 @@ def main():
 
         # get the latest logs
         latest_exp_name = find_last_dir(exp_dir)
-        latest_exp_json = osp.join(exp_dir, latest_exp_name, 'vis_data',
-                                   latest_exp_name + '.json')
+        latest_exp_json = osp.join(
+            exp_dir, latest_exp_name, 'vis_data', f'{latest_exp_name}.json'
+        )
 
         model_performance = get_final_results(
             latest_exp_json, final_epoch_or_iter, by_epoch=by_epoch)
@@ -302,7 +296,7 @@ def main():
 
     pwc_files = convert_model_info_to_pwc(publish_model_infos)
     for name in pwc_files:
-        with open(osp.join(models_out, name + '_metafile.yml'), 'w') as f:
+        with open(osp.join(models_out, f'{name}_metafile.yml'), 'w') as f:
             ordered_yaml_dump(pwc_files[name], f, encoding='utf-8')
 
 

@@ -74,9 +74,7 @@ class PPYOLOECSPResNet(BaseBackbone):
                  norm_eval: bool = False,
                  init_cfg: OptMultiConfig = None,
                  use_large_stem: bool = False):
-        arch_setting = self.arch_settings[arch]
-        if arch_ovewrite:
-            arch_setting = arch_ovewrite
+        arch_setting = arch_ovewrite or self.arch_settings[arch]
         arch_setting = [[
             int(in_channels * widen_factor),
             int(out_channels * widen_factor),
@@ -101,8 +99,8 @@ class PPYOLOECSPResNet(BaseBackbone):
 
     def build_stem_layer(self) -> nn.Module:
         """Build a stem layer."""
-        if self.use_large_stem:
-            stem = nn.Sequential(
+        return (
+            nn.Sequential(
                 ConvModule(
                     self.input_channels,
                     self.arch_setting[0][0] // 2,
@@ -110,7 +108,8 @@ class PPYOLOECSPResNet(BaseBackbone):
                     stride=2,
                     padding=1,
                     act_cfg=self.act_cfg,
-                    norm_cfg=self.norm_cfg),
+                    norm_cfg=self.norm_cfg,
+                ),
                 ConvModule(
                     self.arch_setting[0][0] // 2,
                     self.arch_setting[0][0] // 2,
@@ -118,7 +117,8 @@ class PPYOLOECSPResNet(BaseBackbone):
                     stride=1,
                     padding=1,
                     norm_cfg=self.norm_cfg,
-                    act_cfg=self.act_cfg),
+                    act_cfg=self.act_cfg,
+                ),
                 ConvModule(
                     self.arch_setting[0][0] // 2,
                     self.arch_setting[0][0],
@@ -126,9 +126,11 @@ class PPYOLOECSPResNet(BaseBackbone):
                     stride=1,
                     padding=1,
                     norm_cfg=self.norm_cfg,
-                    act_cfg=self.act_cfg))
-        else:
-            stem = nn.Sequential(
+                    act_cfg=self.act_cfg,
+                ),
+            )
+            if self.use_large_stem
+            else nn.Sequential(
                 ConvModule(
                     self.input_channels,
                     self.arch_setting[0][0] // 2,
@@ -136,7 +138,8 @@ class PPYOLOECSPResNet(BaseBackbone):
                     stride=2,
                     padding=1,
                     norm_cfg=self.norm_cfg,
-                    act_cfg=self.act_cfg),
+                    act_cfg=self.act_cfg,
+                ),
                 ConvModule(
                     self.arch_setting[0][0] // 2,
                     self.arch_setting[0][0],
@@ -144,8 +147,10 @@ class PPYOLOECSPResNet(BaseBackbone):
                     stride=1,
                     padding=1,
                     norm_cfg=self.norm_cfg,
-                    act_cfg=self.act_cfg))
-        return stem
+                    act_cfg=self.act_cfg,
+                ),
+            )
+        )
 
     def build_stage_layer(self, stage_idx: int, setting: list) -> list:
         """Build a stage layer.

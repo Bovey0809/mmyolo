@@ -107,14 +107,7 @@ def main():
         cfg.merge_from_dict(cfg_json)
 
     # build the runner from config
-    if 'runner_type' not in cfg:
-        # build the default runner
-        runner = Runner.from_cfg(cfg)
-    else:
-        # build customized runner from the registry
-        # if 'runner_type' is set in the cfg
-        runner = RUNNERS.build(cfg)
-
+    runner = RUNNERS.build(cfg) if 'runner_type' in cfg else Runner.from_cfg(cfg)
     # add `DumpResults` dummy metric
     if args.out is not None:
         assert args.out.endswith(('.pkl', '.pickle')), \

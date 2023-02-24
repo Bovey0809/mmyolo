@@ -25,8 +25,7 @@ def _get_config_module(fname):
     """Load a configuration as a python module."""
     config_dpath = _get_config_directory()
     config_fpath = join(config_dpath, fname)
-    config_mod = Config.fromfile(config_fpath)
-    return config_mod
+    return Config.fromfile(config_fpath)
 
 
 def get_detector_cfg(fname):
@@ -49,5 +48,4 @@ def _rand_bboxes(rng, num_boxes, w, h):
     br_x = ((cx * w) + (w * bw / 2)).clip(0, w)
     br_y = ((cy * h) + (h * bh / 2)).clip(0, h)
 
-    bboxes = np.vstack([tl_x, tl_y, br_x, br_y]).T
-    return bboxes
+    return np.vstack([tl_x, tl_y, br_x, br_y]).T
