@@ -40,9 +40,7 @@ def shift_predictions(det_data_samples: SampleList,
 
         shifted_predictions.append(pred_inst.clone())
 
-    shifted_predictions = InstanceData.cat(shifted_predictions)
-
-    return shifted_predictions
+    return InstanceData.cat(shifted_predictions)
 
 
 def merge_results_by_nms(results: SampleList, offsets: Sequence[Tuple[int,

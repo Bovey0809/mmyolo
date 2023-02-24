@@ -69,20 +69,19 @@ class BatchDynamicSoftLabelAssigner(nn.Module):
                 gt_bboxes.new_full(pred_scores[..., 0].shape, 0)
             }
 
-        prior_center = priors[:, :2]
         if isinstance(gt_bboxes, BaseBoxes):
             raise NotImplementedError(
                 f'type of {type(gt_bboxes)} are not implemented !')
-        else:
-            # Tensor boxes will be treated as horizontal boxes by defaults
-            lt_ = prior_center[:, None, None] - gt_bboxes[..., :2]
-            rb_ = gt_bboxes[..., 2:] - prior_center[:, None, None]
+        prior_center = priors[:, :2]
+        # Tensor boxes will be treated as horizontal boxes by defaults
+        lt_ = prior_center[:, None, None] - gt_bboxes[..., :2]
+        rb_ = gt_bboxes[..., 2:] - prior_center[:, None, None]
 
-            deltas = torch.cat([lt_, rb_], dim=-1)
-            is_in_gts = deltas.min(dim=-1).values > 0
-            is_in_gts = is_in_gts * pad_bbox_flag[..., 0][None]
-            is_in_gts = is_in_gts.permute(1, 0, 2)
-            valid_mask = is_in_gts.sum(dim=-1) > 0
+        deltas = torch.cat([lt_, rb_], dim=-1)
+        is_in_gts = deltas.min(dim=-1).values > 0
+        is_in_gts = is_in_gts * pad_bbox_flag[..., 0][None]
+        is_in_gts = is_in_gts.permute(1, 0, 2)
+        valid_mask = is_in_gts.sum(dim=-1) > 0
 
         # Tensor boxes will be treated as horizontal boxes by defaults
         gt_center = (gt_bboxes[..., :2] + gt_bboxes[..., 2:]) / 2.0

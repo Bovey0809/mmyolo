@@ -242,9 +242,10 @@ default_hooks = dict(
 
 val_evaluator = dict(
     type='mmdet.CocoMetric',
-    proposal_nums=(100, 1, 10),  # Can be accelerated
-    ann_file=data_root + 'annotations/instances_val2017.json',
-    metric='bbox')
+    proposal_nums=(100, 1, 10),
+    ann_file=f'{data_root}annotations/instances_val2017.json',
+    metric='bbox',
+)
 test_evaluator = val_evaluator
 
 train_cfg = dict(

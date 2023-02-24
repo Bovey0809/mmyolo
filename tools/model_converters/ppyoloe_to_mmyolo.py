@@ -6,18 +6,16 @@ import torch
 
 
 def convert_bn(k: str):
-    name = k.replace('._mean',
-                     '.running_mean').replace('._variance', '.running_var')
-    return name
+    return k.replace('._mean', '.running_mean').replace(
+        '._variance', '.running_var'
+    )
 
 
 def convert_repvgg(k: str):
     if '.conv2.conv1.' in k:
-        name = k.replace('.conv2.conv1.', '.conv2.rbr_dense.')
-        return name
+        return k.replace('.conv2.conv1.', '.conv2.rbr_dense.')
     elif '.conv2.conv2.' in k:
-        name = k.replace('.conv2.conv2.', '.conv2.rbr_1x1.')
-        return name
+        return k.replace('.conv2.conv2.', '.conv2.rbr_1x1.')
     else:
         return k
 
@@ -27,8 +25,8 @@ def convert(src: str, dst: str, imagenet_pretrain: bool = False):
         model = pickle.load(f)
 
     new_state_dict = OrderedDict()
-    if imagenet_pretrain:
-        for k, v in model.items():
+    for k, v in model.items():
+        if imagenet_pretrain:
             if '@@' in k:
                 continue
             if 'stem.' in k:
@@ -36,24 +34,20 @@ def convert(src: str, dst: str, imagenet_pretrain: bool = False):
                 # -> backbone.stem.0.conv.weight
                 org_ind = k.split('.')[1][-1]
                 new_ind = str(int(org_ind) - 1)
-                name = k.replace('stem.conv%s.' % org_ind,
-                                 'stem.%s.' % new_ind)
+                name = k.replace(f'stem.conv{org_ind}.', f'stem.{new_ind}.')
             else:
                 # backbone.stages.1.conv2.bn._variance
                 # -> backbone.stage2.0.conv2.bn.running_var
                 org_stage_ind = k.split('.')[1]
                 new_stage_ind = str(int(org_stage_ind) + 1)
-                name = k.replace('stages.%s.' % org_stage_ind,
-                                 'stage%s.0.' % new_stage_ind)
+                name = k.replace(f'stages.{org_stage_ind}.', f'stage{new_stage_ind}.0.')
                 name = convert_repvgg(name)
                 if '.attn.' in k:
                     name = name.replace('.attn.fc.', '.attn.fc.conv.')
             name = convert_bn(name)
-            name = 'backbone.' + name
+            name = f'backbone.{name}'
 
-            new_state_dict[name] = torch.from_numpy(v)
-    else:
-        for k, v in model.items():
+        else:
             name = k
             if k.startswith('backbone.'):
                 if '.stem.' in k:
@@ -61,15 +55,13 @@ def convert(src: str, dst: str, imagenet_pretrain: bool = False):
                     # -> backbone.stem.0.conv.weight
                     org_ind = k.split('.')[2][-1]
                     new_ind = str(int(org_ind) - 1)
-                    name = k.replace('.stem.conv%s.' % org_ind,
-                                     '.stem.%s.' % new_ind)
+                    name = k.replace(f'.stem.conv{org_ind}.', f'.stem.{new_ind}.')
                 else:
                     # backbone.stages.1.conv2.bn._variance
                     # -> backbone.stage2.0.conv2.bn.running_var
                     org_stage_ind = k.split('.')[2]
                     new_stage_ind = str(int(org_stage_ind) + 1)
-                    name = k.replace('.stages.%s.' % org_stage_ind,
-                                     '.stage%s.0.' % new_stage_ind)
+                    name = k.replace(f'.stages.{org_stage_ind}.', f'.stage{new_stage_ind}.0.')
                     name = convert_repvgg(name)
                     if '.attn.' in k:
                         name = name.replace('.attn.fc.', '.attn.fc.conv.')
@@ -99,24 +91,29 @@ def convert(src: str, dst: str, imagenet_pretrain: bool = False):
                     # neck.fpn_routes.0.conv.weight
                     # -> neck.upsample_layers.0.0.conv.weight
                     index = k.split('.')[2]
-                    name = 'neck.upsample_layers.' + index + '.0.' + '.'.join(
-                        k.split('.')[-2:])
+                    name = f'neck.upsample_layers.{index}.0.' + '.'.join(
+                        k.split('.')[-2:]
+                    )
                     name = name.replace('.0.convs.', '.0.blocks.')
                 elif k.startswith('neck.pan_stages.'):
                     # neck.pan_stages.0.0.conv1.conv.weight
                     # -> neck.bottom_up_layers.1.0.conv1.conv.weight
                     ind = k.split('.')[2]
                     name = k.replace(
-                        'neck.pan_stages.' + ind, 'neck.bottom_up_layers.' +
-                        ('0' if ind == '1' else '1'))
+                        f'neck.pan_stages.{ind}',
+                        'neck.bottom_up_layers.'
+                        + ('0' if ind == '1' else '1'),
+                    )
                     name = name.replace('.0.convs.', '.0.blocks.')
                 elif k.startswith('neck.pan_routes.'):
                     # neck.pan_routes.0.conv.weight
                     # -> neck.downsample_layers.0.conv.weight
                     ind = k.split('.')[2]
                     name = k.replace(
-                        'neck.pan_routes.' + ind, 'neck.downsample_layers.' +
-                        ('0' if ind == '1' else '1'))
+                        f'neck.pan_routes.{ind}',
+                        'neck.downsample_layers.'
+                        + ('0' if ind == '1' else '1'),
+                    )
                     name = name.replace('.0.convs.', '.0.blocks.')
 
                 else:
@@ -157,7 +154,7 @@ def convert(src: str, dst: str, imagenet_pretrain: bool = False):
             else:
                 continue
 
-            new_state_dict[name] = torch.from_numpy(v)
+        new_state_dict[name] = torch.from_numpy(v)
     data = {'state_dict': new_state_dict}
     torch.save(data, dst)
 

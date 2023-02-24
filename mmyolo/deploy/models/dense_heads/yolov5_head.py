@@ -39,10 +39,7 @@ def yolov5_bbox_decoder(priors: Tensor, bbox_preds: Tensor,
     w_pred = (bbox_preds[..., 2] * 2)**2 * w
     h_pred = (bbox_preds[..., 3] * 2)**2 * h
 
-    decoded_bboxes = torch.stack(
-        [x_center_pred, y_center_pred, w_pred, h_pred], dim=-1)
-
-    return decoded_bboxes
+    return torch.stack([x_center_pred, y_center_pred, w_pred, h_pred], dim=-1)
 
 
 @FUNCTION_REWRITER.register_rewriter(
@@ -172,8 +169,7 @@ def yolov5_head__predict__rknn(self, x: Tuple[Tensor], *args,
         x (tuple[Tensor]): Multi-level features from the
             upstream network, each is a 4D-tensor.
     """
-    outs = self(x)
-    return outs
+    return self(x)
 
 
 @FUNCTION_REWRITER.register_rewriter(
@@ -183,7 +179,4 @@ def yolov5_head__predict__rknn(self, x: Tuple[Tensor], *args,
 def yolov5_head_module__forward__rknn(
         self, x: Tensor, *args, **kwargs) -> Tuple[Tensor, Tensor, Tensor]:
     """Forward feature of a single scale level."""
-    out = []
-    for i, feat in enumerate(x):
-        out.append(self.convs_pred[i](feat))
-    return out
+    return [self.convs_pred[i](feat) for i, feat in enumerate(x)]

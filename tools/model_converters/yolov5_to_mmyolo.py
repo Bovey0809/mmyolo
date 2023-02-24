@@ -80,9 +80,12 @@ def convert(src, dst):
     for key, weight in blobs.items():
 
         num, module = key.split('.')[1:3]
-        if (is_p6_model and
-            (num == '11' or num == '33')) or (not is_p6_model and
-                                              (num == '9' or num == '24')):
+        if (
+            is_p6_model
+            and num in ['11', '33']
+            or not is_p6_model
+            and num in ['9', '24']
+        ):
             if module == 'anchors':
                 continue
             prefix = f'model.{num}.{module}'
@@ -103,8 +106,7 @@ def convert(src, dst):
         print(f'Convert {key} to {new_key}')
 
     # save checkpoint
-    checkpoint = dict()
-    checkpoint['state_dict'] = state_dict
+    checkpoint = {'state_dict': state_dict}
     torch.save(checkpoint, dst)
 
 

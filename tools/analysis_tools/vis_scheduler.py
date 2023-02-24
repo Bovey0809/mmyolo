@@ -210,12 +210,11 @@ def simulate_train(data_loader, cfg, by_epoch):
 
     runner.train()
 
-    param_dict = dict(
+    return dict(
         lr=param_record_hook.lr_list,
         momentum=param_record_hook.momentum_list,
-        wd=param_record_hook.wd_list)
-
-    return param_dict
+        wd=param_record_hook.wd_list,
+    )
 
 
 def main():

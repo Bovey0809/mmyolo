@@ -188,9 +188,9 @@ class PPYOLOEBatchRandomResize(BatchSyncRandomResize):
         ``use_ms_training == True``.
         """
         assert isinstance(inputs, list),\
-            'The type of inputs must be list. The possible reason for this ' \
-            'is that you are not using it with `PPYOLOEDetDataPreprocessor` ' \
-            'and `yolov5_collate` with use_ms_training == True.'
+                'The type of inputs must be list. The possible reason for this ' \
+                'is that you are not using it with `PPYOLOEDetDataPreprocessor` ' \
+                'and `yolov5_collate` with use_ms_training == True.'
         message_hub = MessageHub.get_current_instance()
         if (message_hub.get_info('iter') + 1) % self._interval == 0:
             # get current input size
@@ -198,40 +198,35 @@ class PPYOLOEBatchRandomResize(BatchSyncRandomResize):
             if self.random_interp:
                 self.interp_mode = interp_mode
 
-        # TODO: need to support type(inputs)==Tensor
-        if isinstance(inputs, list):
-            outputs = []
-            for i in range(len(inputs)):
-                _batch_input = inputs[i]
-                h, w = _batch_input.shape[-2:]
-                scale_y = self._input_size[0] / h
-                scale_x = self._input_size[1] / w
-                if scale_x != 1. or scale_y != 1.:
-                    if self.interp_mode in ('nearest', 'area'):
-                        align_corners = None
-                    else:
-                        align_corners = False
-                    _batch_input = F.interpolate(
-                        _batch_input.unsqueeze(0),
-                        size=self._input_size,
-                        mode=self.interp_mode,
-                        align_corners=align_corners)
-
-                    # rescale boxes
-                    indexes = data_samples[:, 0] == i
-                    data_samples[indexes, 2] *= scale_x
-                    data_samples[indexes, 3] *= scale_y
-                    data_samples[indexes, 4] *= scale_x
-                    data_samples[indexes, 5] *= scale_y
-                else:
-                    _batch_input = _batch_input.unsqueeze(0)
-
-                outputs.append(_batch_input)
-
-            # convert to Tensor
-            return torch.cat(outputs, dim=0), data_samples
-        else:
+        if not isinstance(inputs, list):
             raise NotImplementedError('Not implemented yet!')
+        outputs = []
+        for i in range(len(inputs)):
+            _batch_input = inputs[i]
+            h, w = _batch_input.shape[-2:]
+            scale_y = self._input_size[0] / h
+            scale_x = self._input_size[1] / w
+            if scale_x != 1. or scale_y != 1.:
+                align_corners = None if self.interp_mode in ('nearest', 'area') else False
+                _batch_input = F.interpolate(
+                    _batch_input.unsqueeze(0),
+                    size=self._input_size,
+                    mode=self.interp_mode,
+                    align_corners=align_corners)
+
+                # rescale boxes
+                indexes = data_samples[:, 0] == i
+                data_samples[indexes, 2] *= scale_x
+                data_samples[indexes, 3] *= scale_y
+                data_samples[indexes, 4] *= scale_x
+                data_samples[indexes, 5] *= scale_y
+            else:
+                _batch_input = _batch_input.unsqueeze(0)
+
+            outputs.append(_batch_input)
+
+        # convert to Tensor
+        return torch.cat(outputs, dim=0), data_samples
 
     def _get_random_size_and_interp(self) -> Tuple[int, int]:
         """Randomly generate a shape in ``_random_size_range`` and a

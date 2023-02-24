@@ -48,7 +48,7 @@ class YOLOv5KeepRatioResize(MMDET_Resize):
                  scale: Union[int, Tuple[int, int]],
                  keep_ratio: bool = True,
                  **kwargs):
-        assert keep_ratio is True
+        assert keep_ratio
         super().__init__(scale=scale, keep_ratio=True, **kwargs)
 
     @staticmethod
@@ -160,7 +160,7 @@ class LetterResize(MMDET_Resize):
 
     def _resize_img(self, results: dict):
         """Resize images with ``results['scale']``."""
-        image = results.get('img', None)
+        image = results.get('img')
         if image is None:
             return
 
@@ -223,7 +223,7 @@ class LetterResize(MMDET_Resize):
             top_padding, bottom_padding, left_padding, right_padding
         ]
         if top_padding != 0 or bottom_padding != 0 or \
-                left_padding != 0 or right_padding != 0:
+                    left_padding != 0 or right_padding != 0:
 
             pad_val = self.pad_val.get('img', 0)
             if isinstance(pad_val, int) and image.ndim == 3:
@@ -240,7 +240,7 @@ class LetterResize(MMDET_Resize):
         results['img_shape'] = image.shape
         if 'pad_param' in results:
             results['pad_param_origin'] = results['pad_param'] * \
-                np.repeat(ratio, 2)
+                    np.repeat(ratio, 2)
         results['pad_param'] = np.array(padding_list, dtype=np.float32)
 
     def _resize_masks(self, results: dict):
@@ -401,10 +401,11 @@ class LoadAnnotations(MMDET_LoadAnnotations):
         Returns:
             dict: The dict contains loaded label annotations.
         """
-        gt_bboxes_labels = []
-        for instance in results.get('instances', []):
-            if instance['ignore_flag'] == 0:
-                gt_bboxes_labels.append(instance['bbox_label'])
+        gt_bboxes_labels = [
+            instance['bbox_label']
+            for instance in results.get('instances', [])
+            if instance['ignore_flag'] == 0
+        ]
         results['gt_bboxes_labels'] = np.array(
             gt_bboxes_labels, dtype=np.int64)
 
@@ -622,11 +623,14 @@ class YOLOv5RandomAffine(BaseTransform):
             np.ndarray: The rotation matrix.
         """
         radian = math.radians(rotate_degrees)
-        rotation_matrix = np.array(
-            [[np.cos(radian), -np.sin(radian), 0.],
-             [np.sin(radian), np.cos(radian), 0.], [0., 0., 1.]],
-            dtype=np.float32)
-        return rotation_matrix
+        return np.array(
+            [
+                [np.cos(radian), -np.sin(radian), 0.0],
+                [np.sin(radian), np.cos(radian), 0.0],
+                [0.0, 0.0, 1.0],
+            ],
+            dtype=np.float32,
+        )
 
     @staticmethod
     def _get_scaling_matrix(scale_ratio: float) -> np.ndarray:
@@ -638,10 +642,10 @@ class YOLOv5RandomAffine(BaseTransform):
         Returns:
             np.ndarray: The scaling matrix.
         """
-        scaling_matrix = np.array(
-            [[scale_ratio, 0., 0.], [0., scale_ratio, 0.], [0., 0., 1.]],
-            dtype=np.float32)
-        return scaling_matrix
+        return np.array(
+            [[scale_ratio, 0.0, 0.0], [0.0, scale_ratio, 0.0], [0.0, 0.0, 1.0]],
+            dtype=np.float32,
+        )
 
     @staticmethod
     def _get_shear_matrix(x_shear_degrees: float,
@@ -657,10 +661,14 @@ class YOLOv5RandomAffine(BaseTransform):
         """
         x_radian = math.radians(x_shear_degrees)
         y_radian = math.radians(y_shear_degrees)
-        shear_matrix = np.array([[1, np.tan(x_radian), 0.],
-                                 [np.tan(y_radian), 1, 0.], [0., 0., 1.]],
-                                dtype=np.float32)
-        return shear_matrix
+        return np.array(
+            [
+                [1, np.tan(x_radian), 0.0],
+                [np.tan(y_radian), 1, 0.0],
+                [0.0, 0.0, 1.0],
+            ],
+            dtype=np.float32,
+        )
 
     @staticmethod
     def _get_translation_matrix(x: float, y: float) -> np.ndarray:
@@ -673,9 +681,9 @@ class YOLOv5RandomAffine(BaseTransform):
         Returns:
             np.ndarray: The translation matrix.
         """
-        translation_matrix = np.array([[1, 0., x], [0., 1, y], [0., 0., 1.]],
-                                      dtype=np.float32)
-        return translation_matrix
+        return np.array(
+            [[1, 0.0, x], [0.0, 1, y], [0.0, 0.0, 1.0]], dtype=np.float32
+        )
 
 
 @TRANSFORMS.register_module()
@@ -935,11 +943,12 @@ class PPYOLOERandomCrop(BaseTransform):
                 return results
 
             found = False
-            for i in range(self.num_attempts):
+            for _ in range(self.num_attempts):
                 crop_h, crop_w = self._get_crop_size((orig_img_h, orig_img_w))
-                if self.aspect_ratio is None:
-                    if crop_h / crop_w < 0.5 or crop_h / crop_w > 2.0:
-                        continue
+                if self.aspect_ratio is None and (
+                    crop_h / crop_w < 0.5 or crop_h / crop_w > 2.0
+                ):
+                    continue
 
                 # get image crop_box
                 margin_h = max(orig_img_h - crop_h, 0)

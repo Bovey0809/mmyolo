@@ -67,19 +67,18 @@ class YOLOv6RepPAFPN(BaseYOLONeck):
         Returns:
             nn.Module: The reduce layer.
         """
-        if idx == 2:
-            layer = ConvModule(
+        return (
+            ConvModule(
                 in_channels=int(self.in_channels[idx] * self.widen_factor),
-                out_channels=int(self.out_channels[idx - 1] *
-                                 self.widen_factor),
+                out_channels=int(self.out_channels[idx - 1] * self.widen_factor),
                 kernel_size=1,
                 stride=1,
                 norm_cfg=self.norm_cfg,
-                act_cfg=self.act_cfg)
-        else:
-            layer = nn.Identity()
-
-        return layer
+                act_cfg=self.act_cfg,
+            )
+            if idx == 2
+            else nn.Identity()
+        )
 
     def build_upsample_layer(self, idx: int) -> nn.Module:
         """build upsample layer.

@@ -48,8 +48,7 @@ class TestYOLOv6EfficientRep(TestCase):
         assert check_norm_state(model.modules(), False)
 
         # Test YOLOv6EfficientRep-P5 forward with widen_factor=0.25
-        model = YOLOv6EfficientRep(
-            arch='P5', widen_factor=0.25, out_indices=range(0, 5))
+        model = YOLOv6EfficientRep(arch='P5', widen_factor=0.25, out_indices=range(5))
         model.train()
 
         imgs = torch.randn(1, 3, 64, 64)
@@ -63,9 +62,8 @@ class TestYOLOv6EfficientRep(TestCase):
 
         # Test YOLOv6EfficientRep forward with dict(type='ReLU')
         model = YOLOv6EfficientRep(
-            widen_factor=0.125,
-            act_cfg=dict(type='ReLU'),
-            out_indices=range(0, 5))
+            widen_factor=0.125, act_cfg=dict(type='ReLU'), out_indices=range(5)
+        )
         model.train()
 
         imgs = torch.randn(1, 3, 64, 64)
@@ -78,7 +76,7 @@ class TestYOLOv6EfficientRep(TestCase):
         assert feat[4].shape == torch.Size((1, 128, 2, 2))
 
         # Test YOLOv6EfficientRep with BatchNorm forward
-        model = YOLOv6EfficientRep(widen_factor=0.125, out_indices=range(0, 5))
+        model = YOLOv6EfficientRep(widen_factor=0.125, out_indices=range(5))
         for m in model.modules():
             if is_norm(m):
                 assert isinstance(m, _BatchNorm)
@@ -137,8 +135,7 @@ class TestYOLOv6EfficientRep(TestCase):
         assert check_norm_state(model.modules(), False)
 
         # Test YOLOv6CSPBep forward with widen_factor=0.25
-        model = YOLOv6CSPBep(
-            arch='P5', widen_factor=0.25, out_indices=range(0, 5))
+        model = YOLOv6CSPBep(arch='P5', widen_factor=0.25, out_indices=range(5))
         model.train()
 
         imgs = torch.randn(1, 3, 64, 64)
@@ -152,9 +149,8 @@ class TestYOLOv6EfficientRep(TestCase):
 
         # Test YOLOv6CSPBep forward with dict(type='ReLU')
         model = YOLOv6CSPBep(
-            widen_factor=0.125,
-            act_cfg=dict(type='ReLU'),
-            out_indices=range(0, 5))
+            widen_factor=0.125, act_cfg=dict(type='ReLU'), out_indices=range(5)
+        )
         model.train()
 
         imgs = torch.randn(1, 3, 64, 64)
@@ -167,7 +163,7 @@ class TestYOLOv6EfficientRep(TestCase):
         assert feat[4].shape == torch.Size((1, 128, 2, 2))
 
         # Test YOLOv6CSPBep with BatchNorm forward
-        model = YOLOv6CSPBep(widen_factor=0.125, out_indices=range(0, 5))
+        model = YOLOv6CSPBep(widen_factor=0.125, out_indices=range(5))
         for m in model.modules():
             if is_norm(m):
                 assert isinstance(m, _BatchNorm)

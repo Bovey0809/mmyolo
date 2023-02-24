@@ -93,7 +93,7 @@ class YOLOv7OptimWrapperConstructor:
             accumulate = max(
                 round(self.base_total_batch_size / total_batch_size), 1)
             scale_factor = total_batch_size * \
-                accumulate / self.base_total_batch_size
+                    accumulate / self.base_total_batch_size
 
             if scale_factor != 1:
                 weight_decay *= scale_factor
@@ -134,6 +134,6 @@ class YOLOv7OptimWrapperConstructor:
         del params_groups
 
         optimizer = OPTIMIZERS.build(optimizer_cfg)
-        optim_wrapper = OPTIM_WRAPPERS.build(
-            self.optim_wrapper_cfg, default_args=dict(optimizer=optimizer))
-        return optim_wrapper
+        return OPTIM_WRAPPERS.build(
+            self.optim_wrapper_cfg, default_args=dict(optimizer=optimizer)
+        )

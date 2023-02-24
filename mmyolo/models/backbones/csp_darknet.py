@@ -114,7 +114,6 @@ class YOLOv5CSPDarknet(BaseBackbone):
         in_channels = make_divisible(in_channels, self.widen_factor)
         out_channels = make_divisible(out_channels, self.widen_factor)
         num_blocks = make_round(num_blocks, self.deepen_factor)
-        stage = []
         conv_layer = ConvModule(
             in_channels,
             out_channels,
@@ -123,7 +122,7 @@ class YOLOv5CSPDarknet(BaseBackbone):
             padding=1,
             norm_cfg=self.norm_cfg,
             act_cfg=self.act_cfg)
-        stage.append(conv_layer)
+        stage = [conv_layer]
         csp_layer = CSPLayer(
             out_channels,
             out_channels,
@@ -259,7 +258,6 @@ class YOLOv8CSPDarknet(BaseBackbone):
         in_channels = make_divisible(in_channels, self.widen_factor)
         out_channels = make_divisible(out_channels, self.widen_factor)
         num_blocks = make_round(num_blocks, self.deepen_factor)
-        stage = []
         conv_layer = ConvModule(
             in_channels,
             out_channels,
@@ -268,7 +266,7 @@ class YOLOv8CSPDarknet(BaseBackbone):
             padding=1,
             norm_cfg=self.norm_cfg,
             act_cfg=self.act_cfg)
-        stage.append(conv_layer)
+        stage = [conv_layer]
         csp_layer = CSPLayerWithTwoConv(
             out_channels,
             out_channels,
@@ -396,9 +394,8 @@ class YOLOXCSPDarknet(BaseBackbone):
         in_channels = make_divisible(in_channels, self.widen_factor)
         out_channels = make_divisible(out_channels, self.widen_factor)
         num_blocks = make_round(num_blocks, self.deepen_factor)
-        stage = []
         conv = DepthwiseSeparableConvModule \
-            if self.use_depthwise else ConvModule
+                if self.use_depthwise else ConvModule
         conv_layer = conv(
             in_channels,
             out_channels,
@@ -407,7 +404,7 @@ class YOLOXCSPDarknet(BaseBackbone):
             padding=1,
             norm_cfg=self.norm_cfg,
             act_cfg=self.act_cfg)
-        stage.append(conv_layer)
+        stage = [conv_layer]
         if use_spp:
             spp = SPPFBottleneck(
                 out_channels,

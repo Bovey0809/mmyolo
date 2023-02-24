@@ -711,12 +711,11 @@ def convert(src, dst):
     convert_dict = convert_dicts[osp.basename(src)]
 
     num_levels = 3
-    if src_key == 'yolov7.pt':
-        indexes = [102, 51]
-        in_channels = [256, 512, 1024]
-    elif src_key == 'yolov7x.pt':
-        indexes = [121, 59]
-        in_channels = [320, 640, 1280]
+    if src_key == 'yolov7-e6.pt':
+        indexes = [140, [2, 13, 24, 35, 46, 57, 100, 112, 124]]
+        in_channels = 320, 640, 960, 1280
+        num_levels = 4
+
     elif src_key == 'yolov7-tiny.pt':
         indexes = [77, 1000]
         in_channels = [128, 256, 512]
@@ -724,11 +723,12 @@ def convert(src, dst):
         indexes = [118, 47]
         in_channels = [256, 512, 768, 1024]
         num_levels = 4
-    elif src_key == 'yolov7-e6.pt':
-        indexes = [140, [2, 13, 24, 35, 46, 57, 100, 112, 124]]
-        in_channels = 320, 640, 960, 1280
-        num_levels = 4
-
+    elif src_key == 'yolov7.pt':
+        indexes = [102, 51]
+        in_channels = [256, 512, 1024]
+    elif src_key == 'yolov7x.pt':
+        indexes = [121, 59]
+        in_channels = [320, 640, 1280]
     if isinstance(indexes[1], int):
         indexes[1] = [indexes[1]]
     """Convert keys in detectron pretrained YOLOv7 models to mmyolo style."""
@@ -750,41 +750,32 @@ def convert(src, dst):
         if int(num) < indexes[0] and int(num) not in indexes[1]:
             prefix = f'model.{num}'
             new_key = key.replace(prefix, convert_dict[prefix])
-            state_dict[new_key] = weight
-            print(f'Convert {key} to {new_key}')
         elif int(num) in indexes[1]:
             strs_key = key.split('.')[:3]
             new_key = key.replace('.'.join(strs_key),
                                   convert_dict['.'.join(strs_key)])
-            state_dict[new_key] = weight
-            print(f'Convert {key} to {new_key}')
         else:
             strs_key = key.split('.')[:4]
             new_key = key.replace('.'.join(strs_key),
                                   convert_dict['.'.join(strs_key)])
-            state_dict[new_key] = weight
-            print(f'Convert {key} to {new_key}')
-
+        state_dict[new_key] = weight
+        print(f'Convert {key} to {new_key}')
     # Add ImplicitA and ImplicitM
     for i in range(num_levels):
         if num_levels == 3:
             implicit_a = f'bbox_head.head_module.' \
                          f'convs_pred.{i}.0.implicit'
-            state_dict[implicit_a] = torch.zeros((1, in_channels[i], 1, 1))
             implicit_m = f'bbox_head.head_module.' \
                          f'convs_pred.{i}.2.implicit'
-            state_dict[implicit_m] = torch.ones((1, 3 * 85, 1, 1))
         else:
             implicit_a = f'bbox_head.head_module.' \
                          f'main_convs_pred.{i}.1.implicit'
-            state_dict[implicit_a] = torch.zeros((1, in_channels[i], 1, 1))
             implicit_m = f'bbox_head.head_module.' \
                          f'main_convs_pred.{i}.3.implicit'
-            state_dict[implicit_m] = torch.ones((1, 3 * 85, 1, 1))
-
+        state_dict[implicit_a] = torch.zeros((1, in_channels[i], 1, 1))
+        state_dict[implicit_m] = torch.ones((1, 3 * 85, 1, 1))
     # save checkpoint
-    checkpoint = dict()
-    checkpoint['state_dict'] = state_dict
+    checkpoint = {'state_dict': state_dict}
     torch.save(checkpoint, dst)
 
 

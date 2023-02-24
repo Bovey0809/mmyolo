@@ -118,24 +118,23 @@ def reshape_transform(feats: Union[Tensor, List[Tensor]],
 
     if isinstance(feats, torch.Tensor):
         feats = [feats]
-    else:
-        if is_need_grad:
-            raise NotImplementedError('The `grad_base` method does not '
-                                      'support output multi-activation layers')
+    elif is_need_grad:
+        raise NotImplementedError('The `grad_base` method does not '
+                                  'support output multi-activation layers')
 
-    max_h = max([im.shape[-2] for im in feats])
-    max_w = max([im.shape[-1] for im in feats])
-    if -1 in max_shape:
-        max_shape = (max_h, max_w)
-    else:
-        max_shape = (min(max_h, max_shape[0]), min(max_w, max_shape[1]))
-
-    activations = []
-    for feat in feats:
-        activations.append(
-            torch.nn.functional.interpolate(
-                torch.abs(feat), max_shape, mode='bilinear'))
-
+    max_h = max(im.shape[-2] for im in feats)
+    max_w = max(im.shape[-1] for im in feats)
+    max_shape = (
+        (max_h, max_w)
+        if -1 in max_shape
+        else (min(max_h, max_shape[0]), min(max_w, max_shape[1]))
+    )
+    activations = [
+        torch.nn.functional.interpolate(
+            torch.abs(feat), max_shape, mode='bilinear'
+        )
+        for feat in feats
+    ]
     activations = torch.cat(activations, axis=1)
     return activations
 
@@ -159,10 +158,11 @@ class BoxAMDetectorWrapper(nn.Module):
         pipeline_cfg = copy.deepcopy(self.cfg.test_dataloader.dataset.pipeline)
         pipeline_cfg[0].type = 'mmdet.LoadImageFromNDArray'
 
-        new_test_pipeline = []
-        for pipeline in pipeline_cfg:
-            if not pipeline['type'].endswith('LoadAnnotations'):
-                new_test_pipeline.append(pipeline)
+        new_test_pipeline = [
+            pipeline
+            for pipeline in pipeline_cfg
+            if not pipeline['type'].endswith('LoadAnnotations')
+        ]
         self.test_pipeline = Compose(new_test_pipeline)
 
         self.is_need_loss = False
@@ -205,9 +205,10 @@ class BoxAMDetectorWrapper(nn.Module):
                 # Prevent the model algorithm error when calculating loss
                 self.detector.bbox_head.featmap_sizes = None
 
-            data_ = {}
-            data_['inputs'] = [self.input_data['inputs']]
-            data_['data_samples'] = [self.input_data['data_samples']]
+            data_ = {
+                'inputs': [self.input_data['inputs']],
+                'data_samples': [self.input_data['data_samples']],
+            }
             data = self.detector.data_preprocessor(data_, training=False)
             loss = self.detector._run_forward(data, mode='loss')
 
@@ -217,8 +218,7 @@ class BoxAMDetectorWrapper(nn.Module):
             return [loss]
         else:
             with torch.no_grad():
-                results = self.detector.test_step(self.input_data)
-                return results
+                return self.detector.test_step(self.input_data)
 
 
 class BoxAMDetectorVisualizer:
@@ -242,16 +242,17 @@ class BoxAMDetectorVisualizer:
             self.cam = AblationCAM(
                 model,
                 target_layers,
-                use_cuda=True if 'cuda' in model.device else False,
+                use_cuda='cuda' in model.device,
                 reshape_transform=reshape_transform,
                 batch_size=batch_size,
                 ablation_layer=extra_params['ablation_layer'],
-                ratio_channels_to_ablate=ratio_channels_to_ablate)
+                ratio_channels_to_ablate=ratio_channels_to_ablate,
+            )
         else:
             self.cam = method_class(
                 model,
                 target_layers,
-                use_cuda=True if 'cuda' in model.device else False,
+                use_cuda='cuda' in model.device,
                 reshape_transform=reshape_transform,
             )
             if self.is_need_grad:
@@ -288,7 +289,7 @@ class BoxAMDetectorVisualizer:
         boxes = pred_instance.bboxes
         labels = pred_instance.labels
 
-        if with_norm_in_bboxes is True:
+        if with_norm_in_bboxes:
             boxes = boxes.astype(np.int32)
             renormalized_am = np.zeros(grayscale_am.shape, dtype=np.float32)
             images = []
@@ -306,9 +307,9 @@ class BoxAMDetectorVisualizer:
         am_image_renormalized = show_cam_on_image(
             image / 255, renormalized_am, use_rgb=False)
 
-        image_with_bounding_boxes = self._draw_boxes(
-            boxes, labels, am_image_renormalized, pred_instance.get('scores'))
-        return image_with_bounding_boxes
+        return self._draw_boxes(
+            boxes, labels, am_image_renormalized, pred_instance.get('scores')
+        )
 
     def _draw_boxes(self,
                     boxes: List,
@@ -323,8 +324,7 @@ class BoxAMDetectorVisualizer:
                           (int(box[2]), int(box[3])), color, 2)
             if scores is not None:
                 score = scores[i]
-                text = str(self.classes[label]) + ': ' + str(
-                    round(score * 100, 1))
+                text = f'{str(self.classes[label])}: {str(round(score * 100, 1))}'
             else:
                 text = self.classes[label]
 
@@ -422,13 +422,9 @@ class DetBoxScoreTarget:
             # results is dict
             for loss_key, loss_value in results.items():
                 if 'loss' not in loss_key or \
-                        loss_key in self.ignore_loss_params:
+                            loss_key in self.ignore_loss_params:
                     continue
-                if isinstance(loss_value, list):
-                    output += sum(loss_value)
-                else:
-                    output += loss_value
-            return output
+                output += sum(loss_value) if isinstance(loss_value, list) else loss_value
         else:
             # grad-free method
             # results is DetDataSample
@@ -450,7 +446,8 @@ class DetBoxScoreTarget:
                     # TODO: Adaptive adjustment of weights based on algorithms
                     score = ious[0, index] + pred_scores[index]
                     output = output + score
-            return output
+
+        return output
 
 
 class SpatialBaseCAM(BaseCAM):
@@ -472,11 +469,11 @@ class SpatialBaseCAM(BaseCAM):
         weights = self.get_cam_weights(input_tensor, target_layer, targets,
                                        activations, grads)
         weighted_activations = weights * activations
-        if eigen_smooth:
-            cam = get_2d_projection(weighted_activations)
-        else:
-            cam = weighted_activations.sum(axis=1)
-        return cam
+        return (
+            get_2d_projection(weighted_activations)
+            if eigen_smooth
+            else weighted_activations.sum(axis=1)
+        )
 
 
 class GradCAM(SpatialBaseCAM, Base_GradCAM):
@@ -504,5 +501,4 @@ class GradCAMPlusPlus(SpatialBaseCAM, Base_GradCAMPlusPlus):
         # And zero out aijs where the activations are 0
         aij = np.where(grads != 0, aij, 0)
 
-        weights = np.maximum(grads, 0) * aij
-        return weights
+        return np.maximum(grads, 0) * aij

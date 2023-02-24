@@ -26,11 +26,11 @@ for f in files:
         for x in re.findall(r'\[model\]\((https?.*)\)', content)
     }
 
-    if len(ckpts) == 0:
+    if not ckpts:
         continue
 
-    _papertype = [x for x in re.findall(r'\[([A-Z]+)\]', content)]
-    assert len(_papertype) > 0
+    _papertype = list(re.findall(r'\[([A-Z]+)\]', content))
+    assert _papertype
     papertype = _papertype[0]
 
     paper = {(papertype, title)}

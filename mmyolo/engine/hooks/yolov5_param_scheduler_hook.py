@@ -44,7 +44,7 @@ class YOLOv5ParamSchedulerHook(ParamSchedulerHook):
         self.warmup_momentum = warmup_momentum
         self.warmup_mim_iter = warmup_mim_iter
 
-        kwargs.update({'lr_factor': lr_factor, 'max_epochs': max_epochs})
+        kwargs |= {'lr_factor': lr_factor, 'max_epochs': max_epochs}
         self.scheduler_fn = self.scheduler_maps[scheduler_type](**kwargs)
 
         self._warmup_end = False
@@ -83,9 +83,6 @@ class YOLOv5ParamSchedulerHook(ParamSchedulerHook):
             data_batch (dict or tuple or list, optional): Data from dataloader.
         """
         cur_iters = runner.iter
-        cur_epoch = runner.epoch
-        optimizer = runner.optim_wrapper.optimizer
-
         # The minimum warmup is self.warmup_mim_iter
         warmup_total_iters = max(
             round(self.warmup_epochs * len(runner.train_dataloader)),
@@ -93,6 +90,9 @@ class YOLOv5ParamSchedulerHook(ParamSchedulerHook):
 
         if cur_iters <= warmup_total_iters:
             xp = [0, warmup_total_iters]
+            cur_epoch = runner.epoch
+            optimizer = runner.optim_wrapper.optimizer
+
             for group_idx, param in enumerate(optimizer.param_groups):
                 if group_idx == 2:
                     # bias learning rate will be handled specially

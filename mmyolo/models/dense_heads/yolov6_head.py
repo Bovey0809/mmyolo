@@ -384,12 +384,11 @@ class YOLOv6Head(YOLOv5Head):
         Returns:
             Tensor: batch gt instances data, shape [batch_size, number_gt, 5]
         """
+        # fill [-1., 0., 0., 0., 0.] if some shape of
+        # single batch not equal max_gt_bbox_len
+        batch_instance_list = []
         if isinstance(batch_gt_instances, Sequence):
-            max_gt_bbox_len = max(
-                [len(gt_instances) for gt_instances in batch_gt_instances])
-            # fill [-1., 0., 0., 0., 0.] if some shape of
-            # single batch not equal max_gt_bbox_len
-            batch_instance_list = []
+            max_gt_bbox_len = max(len(gt_instances) for gt_instances in batch_gt_instances)
             for index, gt_instance in enumerate(batch_gt_instances):
                 bboxes = gt_instance.bboxes
                 labels = gt_instance.labels
@@ -405,16 +404,11 @@ class YOLOv6Head(YOLOv5Head):
                 batch_instance_list[index] = torch.cat(
                     (batch_instance_list[-1], fill_tensor), dim=0)
 
-            return torch.stack(batch_instance_list)
         else:
-            # faster version
-            # sqlit batch gt instance [all_gt_bboxes, 6] ->
-            # [batch_size, number_gt_each_batch, 5]
-            batch_instance_list = []
             max_gt_bbox_len = 0
             for i in range(batch_size):
                 single_batch_instance = \
-                    batch_gt_instances[batch_gt_instances[:, 0] == i, :]
+                        batch_gt_instances[batch_gt_instances[:, 0] == i, :]
                 single_batch_instance = single_batch_instance[:, 1:]
                 batch_instance_list.append(single_batch_instance)
                 if len(single_batch_instance) > max_gt_bbox_len:
@@ -431,4 +425,5 @@ class YOLOv6Head(YOLOv5Head):
                 batch_instance_list[index] = torch.cat(
                     (batch_instance_list[index], fill_tensor), dim=0)
 
-            return torch.stack(batch_instance_list)
+
+        return torch.stack(batch_instance_list)

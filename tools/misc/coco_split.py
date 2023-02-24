@@ -26,8 +26,7 @@ def parse_args():
         action='store_true',
         help='Whether to display in disorder')
     parser.add_argument('--seed', default=-1, type=int, help='seed')
-    args = parser.parse_args()
-    return args
+    return parser.parse_args()
 
 
 def split_coco_dataset(coco_json_path: str, save_dir: str, ratios: list,
@@ -64,7 +63,7 @@ def split_coco_dataset(coco_json_path: str, save_dir: str, ratios: list,
           f'Val ratio = {ratio_val}, number = {val_image_num}\n'
           f'Test ratio = {ratio_test}, number = {test_image_num}')
 
-    seed = int(seed)
+    seed = seed
     if seed != -1:
         print(f'Set the global seed: {seed}')
         np.random.seed(seed)

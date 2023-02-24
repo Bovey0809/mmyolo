@@ -138,8 +138,7 @@ class YOLOv7p6HeadModule(YOLOv5HeadModule):
                            self.aux_convs_pred)
 
     def forward_single(self, x: Tensor, convs: nn.Module,
-                       aux_convs: Optional[nn.Module]) \
-            -> Tuple[Union[Tensor, List], Union[Tensor, List],
+                       aux_convs: Optional[nn.Module]) -> Tuple[Union[Tensor, List], Union[Tensor, List],
                      Union[Tensor, List]]:
         """Forward feature of a single scale level."""
 
@@ -154,18 +153,17 @@ class YOLOv7p6HeadModule(YOLOv5HeadModule):
 
         if not self.training or not self.use_aux:
             return cls_score, bbox_pred, objectness
-        else:
-            aux_pred_map = aux_convs(x)
-            aux_pred_map = aux_pred_map.view(bs, self.num_base_priors,
-                                             self.num_out_attrib, ny, nx)
-            aux_cls_score = aux_pred_map[:, :, 5:, ...].reshape(bs, -1, ny, nx)
-            aux_bbox_pred = aux_pred_map[:, :, :4, ...].reshape(bs, -1, ny, nx)
-            aux_objectness = aux_pred_map[:, :, 4:5,
-                                          ...].reshape(bs, -1, ny, nx)
+        aux_pred_map = aux_convs(x)
+        aux_pred_map = aux_pred_map.view(bs, self.num_base_priors,
+                                         self.num_out_attrib, ny, nx)
+        aux_cls_score = aux_pred_map[:, :, 5:, ...].reshape(bs, -1, ny, nx)
+        aux_bbox_pred = aux_pred_map[:, :, :4, ...].reshape(bs, -1, ny, nx)
+        aux_objectness = aux_pred_map[:, :, 4:5,
+                                      ...].reshape(bs, -1, ny, nx)
 
-            return [cls_score,
-                    aux_cls_score], [bbox_pred, aux_bbox_pred
-                                     ], [objectness, aux_objectness]
+        return [cls_score,
+                aux_cls_score], [bbox_pred, aux_bbox_pred
+                                 ], [objectness, aux_objectness]
 
 
 @MODELS.register_module()
@@ -400,5 +398,4 @@ class YOLOv7Head(YOLOv5Head):
         bbox_pred = bbox_pred.sigmoid()
         pred_xy = bbox_pred[:, :2] * 2 - 0.5 + grid_xy
         pred_wh = (bbox_pred[:, 2:] * 2)**2 * priors_base_sizes
-        decoded_bbox_pred = torch.cat((pred_xy, pred_wh), dim=-1)
-        return decoded_bbox_pred
+        return torch.cat((pred_xy, pred_wh), dim=-1)

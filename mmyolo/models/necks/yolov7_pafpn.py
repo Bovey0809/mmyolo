@@ -100,24 +100,25 @@ class YOLOv7PAFPN(BaseYOLONeck):
         Returns:
             nn.Module: The reduce layer.
         """
-        if idx == len(self.in_channels) - 1:
-            layer = SPPFCSPBlock(
+        return (
+            SPPFCSPBlock(
                 self.in_channels[idx],
                 self.out_channels[idx],
                 expand_ratio=self.spp_expand_ratio,
                 is_tiny_version=self.is_tiny_version,
                 kernel_sizes=5,
                 norm_cfg=self.norm_cfg,
-                act_cfg=self.act_cfg)
-        else:
-            layer = ConvModule(
+                act_cfg=self.act_cfg,
+            )
+            if idx == len(self.in_channels) - 1
+            else ConvModule(
                 self.in_channels[idx],
                 self.out_channels[idx],
                 1,
                 norm_cfg=self.norm_cfg,
-                act_cfg=self.act_cfg)
-
-        return layer
+                act_cfg=self.act_cfg,
+            )
+        )
 
     def build_upsample_layer(self, idx: int) -> nn.Module:
         """build upsample layer."""

@@ -39,8 +39,7 @@ def parse_args():
         type=float,
         default=1,
         help='The interval of show (s), 0 is block')
-    args = parser.parse_args()
-    return args
+    return parser.parse_args()
 
 
 def main():

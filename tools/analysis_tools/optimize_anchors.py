@@ -103,8 +103,7 @@ def parse_args():
         type=str,
         help='Path to save anchor optimize result.')
 
-    args = parser.parse_args()
-    return args
+    return parser.parse_args()
 
 
 class BaseAnchorOptimizer:
@@ -159,7 +158,7 @@ class BaseAnchorOptimizer:
             gt_instances = data_info['instances']
             for instance in gt_instances:
                 bbox = np.array(instance['bbox'])
-                gt_filter_sizes = bbox[2:4] - bbox[0:2]
+                gt_filter_sizes = bbox[2:4] - bbox[:2]
                 img_shapes.append(img_shape)
                 bbox_whs.append(gt_filter_sizes)
 
@@ -179,9 +178,7 @@ class BaseAnchorOptimizer:
         """
         whs = torch.from_numpy(self.bbox_whs).to(
             self.device, dtype=torch.float32)
-        bboxes = bbox_cxcywh_to_xyxy(
-            torch.cat([torch.zeros_like(whs), whs], dim=1))
-        return bboxes
+        return bbox_cxcywh_to_xyxy(torch.cat([torch.zeros_like(whs), whs], dim=1))
 
     def optimize(self):
         raise NotImplementedError
@@ -436,14 +433,11 @@ class YOLOV5KMeansAnchorOptimizer(BaseAnchorOptimizer):
         return best_ratio_mean, mean_matched
 
     def _filter_box(self, box_size: Tensor) -> Tensor:
-        small_cnt = (box_size < 3.0).any(1).sum()
-        if small_cnt:
+        if small_cnt := (box_size < 3.0).any(1).sum():
             self.logger.warning(
                 f'Extremely small objects found: {small_cnt} '
                 f'of {len(box_size)} labels are <3 pixels in size')
-        # filter > 2 pixels
-        filter_sizes = box_size[(box_size >= 2.0).any(1)]
-        return filter_sizes
+        return box_size[(box_size >= 2.0).any(1)]
 
     def _anchor_fitness(self, box_size: Tensor, anchors: Tensor, thr: float):
         """mutation fitness."""
@@ -540,7 +534,7 @@ class YOLODEAnchorOptimizer(BaseAnchorOptimizer):
         bboxes = self.get_zero_center_bbox_tensor()
 
         bounds = []
-        for i in range(self.num_anchors):
+        for _ in range(self.num_anchors):
             bounds.extend([(0, self.input_shape[0]), (0, self.input_shape[1])])
 
         result = differential_evolution(
@@ -557,9 +551,8 @@ class YOLODEAnchorOptimizer(BaseAnchorOptimizer):
             disp=True)
         self.logger.info(
             f'Anchor evolution finish. Average IOU: {1 - result.fun}')
-        anchors = [(w, h) for w, h in zip(result.x[::2], result.x[1::2])]
-        anchors = sorted(anchors, key=lambda x: x[0] * x[1])
-        return anchors
+        anchors = list(zip(result.x[::2], result.x[1::2]))
+        return sorted(anchors, key=lambda x: x[0] * x[1])
 
     @staticmethod
     def avg_iou_cost(anchor_params, bboxes):
@@ -572,8 +565,7 @@ class YOLODEAnchorOptimizer(BaseAnchorOptimizer):
             torch.cat([torch.zeros_like(anchor_whs), anchor_whs], dim=1))
         ious = bbox_overlaps(bboxes, anchor_boxes)
         max_ious, _ = ious.max(1)
-        cost = 1 - max_ious.mean().item()
-        return cost
+        return 1 - max_ious.mean().item()
 
 
 def main():

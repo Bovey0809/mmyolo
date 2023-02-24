@@ -65,8 +65,7 @@ def parse_args():
         'It also allows nested list/tuple values, e.g. key="[(a,b),(c,d)]" '
         'Note that the quotation marks are necessary and that no white space '
         'is allowed.')
-    args = parser.parse_args()
-    return args
+    return parser.parse_args()
 
 
 class ActivationsWrapper:
@@ -76,9 +75,10 @@ class ActivationsWrapper:
         self.activations = []
         self.handles = []
         self.image = None
-        for target_layer in target_layers:
-            self.handles.append(
-                target_layer.register_forward_hook(self.save_activation))
+        self.handles.extend(
+            target_layer.register_forward_hook(self.save_activation)
+            for target_layer in target_layers
+        )
 
     def save_activation(self, module, input, output):
         self.activations.append(output)

@@ -29,8 +29,7 @@ def parse_args():
         '--device', default='cuda:0', help='Device used for inference')
     parser.add_argument(
         '--show', action='store_true', help='Show the detection results')
-    args = parser.parse_args()
-    return args
+    return parser.parse_args()
 
 
 def preprocess(config):

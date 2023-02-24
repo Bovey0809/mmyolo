@@ -56,7 +56,7 @@ val_dataloader = dict(
 
 test_dataloader = val_dataloader
 
-val_evaluator = dict(ann_file=data_root + 'annotations/trainval.json')
+val_evaluator = dict(ann_file=f'{data_root}annotations/trainval.json')
 test_evaluator = val_evaluator
 
 optim_wrapper = dict(optimizer=dict(lr=base_lr))
