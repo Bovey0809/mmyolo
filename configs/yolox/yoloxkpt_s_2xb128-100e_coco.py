@@ -12,9 +12,9 @@ widen_factor = 0.5
 save_epoch_intervals = 10
 train_batch_size_per_gpu = 128
 # NOTE: for debugging set to 0
-train_num_workers = 4
+train_num_workers = 2
 val_batch_size_per_gpu = 1
-val_num_workers = 4
+val_num_workers = 2
 
 max_epochs = 100
 num_last_epochs = 20
@@ -184,7 +184,7 @@ train_dataloader = dict(
         type=dataset_type,
         data_root=data_root,
         metainfo=dataset_info,
-        ann_file='annotations/person_keypoints_train2017_6280_kpt2bbox.json',
+        ann_file='annotations/person_keypoints_train2017_kpt2bbox.json',
         data_prefix=dict(img='train2017/'),
         filter_cfg=dict(filter_empty_gt=True, min_size=32),
         pipeline=train_pipeline_stage1))
@@ -220,7 +220,7 @@ val_dataloader = dict(
         type=dataset_type,
         data_root=data_root,
         metainfo=dataset_info,
-        ann_file='annotations/person_keypoints_val2017_1256.json',
+        ann_file='annotations/person_keypoints_val2017.json',
         data_prefix=dict(img='val2017/'),
         test_mode=True,
         pipeline=test_pipeline,
@@ -232,11 +232,11 @@ val_evaluator = [
     dict(
         type='mmdet.CocoMetric',
         proposal_nums=(100, 1, 10),
-        ann_file=data_root + 'annotations/person_keypoints_val2017_1256.json',
+        ann_file=data_root + 'annotations/person_keypoints_val2017.json',
         metric=['bbox']),
     dict(
         type='CocoMetric',
-        ann_file=data_root + 'annotations/person_keypoints_val2017_1256.json',
+        ann_file=data_root + 'annotations/person_keypoints_val2017.json',
         score_mode='bbox',
         nms_mode='none')
 ]

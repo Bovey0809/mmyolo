@@ -10,25 +10,28 @@ deepen_factor = 0.33
 widen_factor = 0.5
 
 save_epoch_intervals = 10
-train_batch_size_per_gpu = 8
+train_batch_size_per_gpu = 32
 # NOTE: for debugging set to 0
 train_num_workers = 8
 val_batch_size_per_gpu = 1
 val_num_workers = 2
 
-max_epochs = 100
-num_last_epochs = 15
+max_epochs = 300
+num_last_epochs = 20
+batch_augments_interval = 1
 
 # model settings
 model = dict(
     type='YOLODetector',
-    init_cfg=dict(
-        type='Kaiming',
-        layer='Conv2d',
-        a=2.23606797749979,  # math.sqrt(5)
-        distribution='uniform',
-        mode='fan_in',
-        nonlinearity='leaky_relu'),
+    init_cfg=[
+        dict(
+            type='Kaiming',
+            layer='Conv2d',
+            a=2.23606797749979,  # math.sqrt(5)
+            distribution='uniform',
+            mode='fan_in',
+            nonlinearity='leaky_relu')
+        ],
     # TODO: Waiting for mmengine support
     use_syncbn=False,
     data_preprocessor=dict(
@@ -36,11 +39,12 @@ model = dict(
         pad_size_divisor=32,
         batch_augments=[
             dict(
-                type='mmdet.BatchSyncRandomResize',
+                type='YOLOXPoseBatchSyncRandomResize',
                 random_size_range=(480, 800),
                 size_divisor=32,
-                interval=10)
-        ]),
+                interval=batch_augments_interval)
+        ]
+        ),
     backbone=dict(
         type='YOLOXCSPDarknet',
         deepen_factor=deepen_factor,
@@ -93,7 +97,7 @@ model = dict(
             loss_weight=1.0),
         loss_bbox_aux=dict(
             type='mmdet.L1Loss', reduction='sum', loss_weight=1.0),
-        loss_kpt=dict(type='OksLoss', dataset_info=dataset_info)),
+        loss_kpt=dict(type='OksLoss', loss_type='oks_yolox', dataset_info=dataset_info, loss_weight=70)),
     train_cfg=dict(
         assigner=dict(
             type='mmdet.SimOTAAssigner',
@@ -101,8 +105,8 @@ model = dict(
             iou_calculator=dict(type='mmdet.BboxOverlaps2D'))),
     test_cfg=dict(
         yolox_style=True,  # better
-        multi_label=True,  # 40.5 -> 40.7
-        score_thr=0.001,
+        multi_label=False,  # 40.5 -> 40.7
+        score_thr=0.01,
         max_per_img=300,
         nms=dict(type='nms', iou_threshold=0.65)))
 
@@ -122,11 +126,15 @@ train_pipeline_stage1 = [
     dict(
         # type='mmdet.RandomAffine',
         type='YOLOPoseRandomAffine',
-        scaling_ratio_range=(0.1, 2),
+        max_rotate_degree=10.0,
+        scaling_ratio_range=(0.75, 1),
+        max_translate_ratio=0.0,
+        max_shear_degree=2.0,
         # img_scale is (width, height)
         border=(-img_scale[0] // 2, -img_scale[1] // 2)),
     dict(
         type='YOLOXMixUpPose',
+        prob=0.0,
         flip_ratio=1.0,
         img_scale=img_scale,
         ratio_range=(0.8, 1.6),
@@ -138,7 +146,8 @@ train_pipeline_stage1 = [
         type='YOLOPoseFilterAnnotations',
         min_gt_bbox_wh=(1, 1),
         keep_empty=False,
-        by_keypoints=True),
+        by_keypoints=True,
+        min_keypoints=1),
     dict(
         type='YOLOPosePackInputs',
         meta_keys=('img_id', 'img_path', 'ori_shape', 'img_shape'))
@@ -158,37 +167,41 @@ train_pipeline_stage2 = [
     dict(
         type='YOLOPoseFilterAnnotations',
         min_gt_bbox_wh=(1, 1),
-        keep_empty=False),
+        keep_empty=False,
+        by_keypoints=True,
+        min_keypoints=1),
     dict(type='YOLOPosePackInputs')
 ]
 
 train_dataloader = dict(
     batch_size=train_batch_size_per_gpu,
     num_workers=train_num_workers,
-    persistent_workers=False,  # NOTE: for debugging
+    persistent_workers=True,  # NOTE: for debugging
     pin_memory=False,  # NOTE: for debugging
     sampler=dict(type='DefaultSampler', shuffle=True),
+    # collate_fn=dict(type='yolov5_collate'),
     dataset=dict(
         type=dataset_type,
         data_root=data_root,
         metainfo=dataset_info,
-        ann_file='annotations/person_keypoints_train2017.json',
+        ann_file='annotations/person_keypoints_train2017_kpt2bbox.json',
         data_prefix=dict(img='train2017/'),
-        filter_cfg=dict(filter_empty_gt=False, min_size=32),
+        filter_cfg=dict(filter_empty_gt=True, min_size=32),
         pipeline=train_pipeline_stage1))
 
 test_pipeline = [
     *pre_transform,
-    # dict(type='LoadImageFromFile', file_client_args=_base_.file_client_args),
     dict(type='YOLOPoseResize', scale=img_scale, keep_ratio=True),
     dict(
         type='mmdet.Pad',
         pad_to_square=True,
         pad_val=dict(img=(114.0, 114.0, 114.0))),
-    # dict(
-    #     type='LoadAnnotations',
-    #     with_bbox=True,
-    #     with_keypoints=True),
+    dict(
+        type='YOLOPoseFilterAnnotations',
+        min_gt_bbox_wh=(1, 1),
+        keep_empty=False,
+        by_keypoints=True,
+        min_keypoints=1),
     dict(
         type='YOLOPosePackInputs',
         meta_keys=('img_id', 'img_path', 'ori_shape', 'img_shape',
@@ -198,7 +211,8 @@ test_pipeline = [
 val_dataloader = dict(
     batch_size=val_batch_size_per_gpu,
     num_workers=val_num_workers,
-    persistent_workers=False,  # NOTE: for debugging
+    persistent_workers=True,  # NOTE: for debugging
+    # collate_fn=dict(type='yolov5_collate'),
     pin_memory=False,  # NOTE: for debugging
     drop_last=False,
     sampler=dict(type='DefaultSampler', shuffle=False),
@@ -232,14 +246,13 @@ test_evaluator = val_evaluator
 # optimizer
 # default 8 gpu
 # NOTE: clip grad is necessary for training.
-base_lr = 0.01
+base_lr = 0.004
 optim_wrapper = dict(
+    _delete_=True,
     type='OptimWrapper',
-    optimizer=dict(
-        type='SGD', lr=base_lr, momentum=0.9, weight_decay=5e-4,
-        nesterov=True),
-    paramwise_cfg=dict(norm_decay_mult=0., bias_decay_mult=0.),
-    clip_grad=dict(max_norm=35, norm_type=2))
+    optimizer=dict(type='AdamW', lr=base_lr, weight_decay=0.05),
+    paramwise_cfg=dict(
+        norm_decay_mult=0, bias_decay_mult=0, bypass_duplicate=True))
 
 # learning rate
 param_scheduler = [
@@ -271,6 +284,8 @@ param_scheduler = [
     )
 ]
 
+vis_backends = [dict(type='WandbVisBackend')]
+
 custom_hooks = [
     dict(
         type='YOLOXModeSwitchHook',
@@ -281,10 +296,11 @@ custom_hooks = [
     dict(
         type='EMAHook',
         ema_type='ExpMomentumEMA',
-        momentum=0.0001,
+        momentum=0.0002,
         update_buffers=True,
         strict_load=False,
-        priority=49)
+        priority=49),
+    dict(type="WandbGradVisHook")
 ]
 
 train_cfg = dict(
@@ -293,6 +309,7 @@ train_cfg = dict(
     val_interval=save_epoch_intervals,
     dynamic_intervals=[(max_epochs - num_last_epochs, 1)])
 
-auto_scale_lr = dict(base_batch_size=64)
+auto_scale_lr = dict(base_batch_size=8*train_batch_size_per_gpu)
 val_cfg = dict(type='ValLoop')
 test_cfg = dict(type='TestLoop')
+# load_from="mmyoloxs.pt"
