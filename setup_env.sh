@@ -7,3 +7,5 @@ python -m mim install -i http://devops.io:3141/root/pypi/+simple --trusted-host 
 
 python -m pip install -i http://devops.io:3141/root/pypi/+simple --trusted-host devops.io -r requirements/albu.txt
 python -m mim install -i http://devops.io:3141/root/pypi/+simple --trusted-host devops.io -v -e .
+
+python -m pip install -i http://devops.io:3141/root/pypi/+simple --trusted-host devops.io -r requirements/build.txt
