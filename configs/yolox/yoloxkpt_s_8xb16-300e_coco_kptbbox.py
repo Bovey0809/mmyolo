@@ -18,7 +18,7 @@ val_num_workers = 2
 
 max_epochs = 300
 num_last_epochs = 20
-batch_augments_interval = 1
+batch_augments_interval = 10
 
 # model settings
 model = dict(
@@ -184,7 +184,7 @@ train_dataloader = dict(
         type=dataset_type,
         data_root=data_root,
         metainfo=dataset_info,
-        ann_file='annotations/person_keypoints_train2017.json',
+        ann_file='annotations/person_keypoints_train2017_kpt2bbox.json',
         data_prefix=dict(img='train2017/'),
         filter_cfg=dict(filter_empty_gt=True, min_size=32),
         pipeline=train_pipeline_stage1))
@@ -246,13 +246,14 @@ test_evaluator = val_evaluator
 # optimizer
 # default 8 gpu
 # NOTE: clip grad is necessary for training.
-base_lr = 0.004
+base_lr = 0.01
 optim_wrapper = dict(
-    _delete_=True,
     type='OptimWrapper',
-    optimizer=dict(type='AdamW', lr=base_lr, weight_decay=0.05),
-    paramwise_cfg=dict(
-        norm_decay_mult=0, bias_decay_mult=0, bypass_duplicate=True))
+    optimizer=dict(
+        type='SGD', lr=base_lr, momentum=0.9, weight_decay=5e-4,
+        nesterov=True),
+    paramwise_cfg=dict(norm_decay_mult=0., bias_decay_mult=0.))
+
 
 # learning rate
 param_scheduler = [
@@ -296,7 +297,7 @@ custom_hooks = [
     dict(
         type='EMAHook',
         ema_type='ExpMomentumEMA',
-        momentum=0.0002,
+        momentum=0.0001,
         update_buffers=True,
         strict_load=False,
         priority=49),
