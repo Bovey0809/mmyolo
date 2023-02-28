@@ -123,7 +123,7 @@ class OksLoss(nn.Module):
         s_square = repeat(a_g, 'n -> n h', h=g.shape[1])**2
         e = d_square / (2 * s_square * kn_square + eps)
         return e
-    
+
     def _oks2(self, g, d, a_g, a_d, sigmas, vis_thr=0):
         kpt_mask = (g[..., 2] > 0).float()
         kpt_sigmas = torch.tensor(sigmas, device=g.device, dtype=g.dtype)

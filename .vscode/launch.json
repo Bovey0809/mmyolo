@@ -10,7 +10,7 @@
       "request": "launch",
       "program": "${file}",
       "console": "integratedTerminal",
-      "justMyCode": true
+      "justMyCode": false
     },
     {
       "name": "mmyolo train",
@@ -116,7 +116,8 @@
         "--src",
         "~/yolox-pose/YOLOX_outputs/kpt_anno_separate_head/best_ckpt.pth",
         "--dst",
-        "~/yolox-pose/YOLOX_outputs/kpt_anno_separate_head/best_ckpt_mmyolo.pth"
+        "~/yolox-pose/YOLOX_outputs/kpt_anno_separate_head/best_ckpt_mmyolo.pth",
+        
       ]
     }
   ]
