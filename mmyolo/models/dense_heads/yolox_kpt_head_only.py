@@ -543,8 +543,8 @@ class YOLOXKptOnlyHead(YOLOv5Head):
         if self.use_bbox_aux:
             bbox_aux_target = torch.cat(bbox_aux_target, 0)
 
-        loss_obj = self.loss_obj(flatten_objectness.view(-1, 1),
-                                 obj_targets) / num_total_samples
+        # loss_obj = self.loss_obj(flatten_objectness.view(-1, 1),
+        #                          obj_targets) / num_total_samples
         if num_pos > 0:
             # combine kpt and vis for oks loss to N x K x 3.
             flatten_kpt_vis_preds = torch.cat(
@@ -572,7 +572,6 @@ class YOLOXKptOnlyHead(YOLOv5Head):
             loss_vis = flatten_vis_preds.sum() * 0
 
         loss_dict = dict(
-            loss_obj=loss_obj,
             loss_kpt=loss_kpt,
             loss_vis=loss_vis)
 
