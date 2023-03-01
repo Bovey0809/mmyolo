@@ -10,6 +10,7 @@ from .yolov7_head import YOLOv7Head, YOLOv7HeadModule, YOLOv7p6HeadModule
 from .yolov8_head import YOLOv8Head, YOLOv8HeadModule
 from .yolox_head import YOLOXHead, YOLOXHeadModule
 from .yolox_kpt_head import YOLOXKptHead, YOLOXKptHeadModule
+from .yolox_kpt_head_only import YOLOXKptOnlyHead ,YOLOXKptOnlyHeadModule
 
 __all__ = [
     'YOLOv5Head', 'YOLOv6Head', 'YOLOXHead', 'YOLOv5HeadModule',
@@ -18,4 +19,5 @@ __all__ = [
     'YOLOv7HeadModule', 'YOLOv7p6HeadModule', 'YOLOv8Head', 'YOLOv8HeadModule',
     'RTMDetRotatedHead', 'RTMDetRotatedSepBNHeadModule', 'RTMDetInsSepBNHead',
     'RTMDetInsSepBNHeadModule'
+    'YOLOXKptHead', 'YOLOXKptHeadModule', 'YOLOXKptOnlyHead', 'YOLOXKptOnlyHeadModule'
 ]
