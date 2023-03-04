@@ -16,11 +16,12 @@ from mmengine.model import BaseModule, bias_init_with_prob
 from mmengine.structures import InstanceData
 from torch import Tensor
 from mmengine.config import ConfigDict
+from mmengine.logging import MessageHub
+from torchvision.ops import batched_nms
 
 from mmyolo.registry import MODELS, TASK_UTILS
 from .yolov5_head import YOLOv5Head
 from mmyolo.datasets.utils import Keypoints
-
 
 @MODELS.register_module()
 class YOLOXKptOnlyHeadModule(BaseModule):
@@ -107,11 +108,13 @@ class YOLOXKptOnlyHeadModule(BaseModule):
         # kpt related layers
         self.multi_level_conv_kpt = nn.ModuleList()
         self.multi_level_conv_vis = nn.ModuleList()
+        self.multi_level_conv_obj = nn.ModuleList()
         for _ in self.featmap_strides:
             self.multi_level_kpt_convs.append(self._build_kpt_stacked_convs())
-            conv_kpt, conv_vis = self._build_predictor()
+            conv_kpt, conv_vis, conv_obj = self._build_predictor()
             self.multi_level_conv_kpt.append(conv_kpt)
             self.multi_level_conv_vis.append(conv_vis)
+            self.multi_level_conv_obj.append(conv_obj)
 
     def _build_kpt_stacked_convs(self) -> nn.Sequential:
         """Initialize conv layers of kpt head.
@@ -146,15 +149,17 @@ class YOLOXKptOnlyHeadModule(BaseModule):
         """Initialize predictor layers of a single level head."""
         conv_kpt = nn.Conv2d(self.feat_channels, self.num_keypoints * 2, 1)
         conv_vis = nn.Conv2d(self.feat_channels, self.num_keypoints, 1)
-        return conv_kpt, conv_vis
+        conv_obj = nn.Conv2d(self.feat_channels, 1, 1)
+        return conv_kpt, conv_vis, conv_obj
 
     def init_weights(self):
         """Initialize weights of the head."""
         # Use prior in model initialization to improve stability
         super().init_weights()
         bias_init = bias_init_with_prob(0.01)
-        for conv_vis in self.multi_level_conv_vis:
+        for conv_vis, conv_obj in zip(self.multi_level_conv_vis, self.multi_level_conv_obj):
             conv_vis.bias.data.fill_(bias_init)
+            conv_obj.bias.data.fill_(bias_init)
 
     def forward(self, x: Tuple[Tensor]) -> Tuple[List]:
         """Forward features from the upstream network.
@@ -169,18 +174,19 @@ class YOLOXKptOnlyHeadModule(BaseModule):
 
         return multi_apply(self.forward_single, x, self.multi_level_kpt_convs,
                            self.multi_level_conv_kpt,
-                           self.multi_level_conv_vis)
+                           self.multi_level_conv_vis, self.multi_level_conv_obj)
 
     def forward_single(
             self, x: Tensor, kpt_convs: nn.Module, conv_kpt: nn.Module,
-            conv_vis: nn.Module
+            conv_vis: nn.Module, conv_obj: nn.Module
     ) -> Tuple[Tensor, Tensor]:
         """Forward feature of a single scale level."""
         kpt_feat = kpt_convs(x)
         kpt_pred = conv_kpt(kpt_feat)
         vis_pred = conv_vis(kpt_feat)
+        obj_pred = conv_obj(kpt_feat)
 
-        return kpt_pred, vis_pred
+        return kpt_pred, vis_pred, obj_pred
 
 
 @MODELS.register_module()
@@ -211,7 +217,18 @@ class YOLOXKptOnlyHead(YOLOv5Head):
                      offset=0,
                      strides=[8, 16, 32]),
                  kpt_coder: ConfigType = dict(type='YOLOXKptCoder'),
+                 loss_bbox: ConfigType = dict(
+                     type='mmdet.IoULoss',
+                     mode='square',
+                     eps=1e-16,
+                     reduction='sum',
+                     loss_weight=5.0),
                  loss_cls: ConfigType = dict(
+                     type='mmdet.CrossEntropyLoss',
+                     use_sigmoid=True,
+                     reduction='sum',
+                     loss_weight=1.0),
+                loss_obj: ConfigType = dict(
                      type='mmdet.CrossEntropyLoss',
                      use_sigmoid=True,
                      reduction='sum',
@@ -229,6 +246,8 @@ class YOLOXKptOnlyHead(YOLOv5Head):
             head_module=head_module,
             prior_generator=prior_generator,
             loss_cls=loss_cls,
+            loss_bbox=loss_bbox,
+            loss_obj=loss_obj,
             train_cfg=train_cfg,
             test_cfg=test_cfg,
             init_cfg=init_cfg)
@@ -254,6 +273,7 @@ class YOLOXKptOnlyHead(YOLOv5Head):
     def predict_by_feat(self,
                         kpt_preds: Optional[List[Tensor]] = None,
                         vis_preds: Optional[List[Tensor]] = None,
+                        objectnesses: Optional[List[Tensor]] = None,
                         batch_img_metas: Optional[List[dict]] = None,
                         cfg: Optional[ConfigDict] = None,
                         rescale: bool = True,
@@ -278,6 +298,11 @@ class YOLOXKptOnlyHead(YOLOv5Head):
             List[InstanceData]: prediction results, including boxes, labels, scores, keypoints, keypoints visibility.
         """
         assert len(kpt_preds) == len(vis_preds)
+        if objectnesses is None:
+            with_objectnesses = False
+        else:
+            with_objectnesses = True
+            assert len(kpt_preds) == len(objectnesses)
         cfg = self.test_cfg if cfg is None else cfg
         cfg = copy.deepcopy(cfg)
 
@@ -323,8 +348,15 @@ class YOLOXKptOnlyHead(YOLOv5Head):
             for vis_pred in vis_preds
         ]
         flatten_vis_preds = torch.cat(flatten_vis_preds, dim=1).sigmoid()
+        if with_objectnesses:
+            flatten_objectness = [
+                objectness.permute(0, 2, 3, 1).reshape(num_imgs, -1)
+                for objectness in objectnesses
+            ]
+            flatten_objectness = torch.cat(flatten_objectness, dim=1).sigmoid()
+        else:
+            flatten_objectness = [None for _ in range(num_imgs)]
 
-        flatten_objectness = [None for _ in range(num_imgs)]
         flatten_cls_scores = flatten_vis_preds.max(-1, keepdim=True)[0]
 
         results_list = []
@@ -397,43 +429,22 @@ class YOLOXKptOnlyHead(YOLOv5Head):
             if cfg.get('yolox_style', False):
                 # do not need max_per_img
                 cfg.max_per_img = len(results)
-
-            results = self._bbox_post_process(
-                results=results,
-                cfg=cfg,
-                rescale=False,
-                with_nms=with_nms,
-                img_meta=img_meta)
+            # bbox nms
+            if with_nms:
+                keep = batched_nms(results.bboxes, results.scores, labels, score_thr)
+                results = InstanceData(
+                    bboxes=results.bboxes[keep],
+                    scores=results.scores[keep],
+                    labels=results.labels[keep],
+                    keypoints=results.keypoints[keep],
+                    keypoint_scores=results.keypoint_scores[keep]
+                )
             results.bboxes[:, 0::2].clamp_(0, ori_shape[1])
             results.bboxes[:, 1::2].clamp_(0, ori_shape[0])
-
-            # results = self._kpt_post_process(
-            #     results,
-            #     cfg,
-            #     rescale=False,
-            #     with_nms=with_nms,
-            #     img_meta=img_meta)
-            # keypoints outside the image, the visibility is set to 0
-            # results.keypoints[:, :, 0].clamp_(0, ori_shape[1])
-            # results.keypoints[:, :, 1].clamp_(0, ori_shape[0])
-            # results.keypoint_scores[results.keypoints[:, :, 0] == 0] = 0
-            # results.keypoint_scores[results.keypoints[:, :, 1] == 0] = 0
-
             results_list.append(results)
+        message_hub = MessageHub.get_current_instance()
+        message_hub.update_scalar('test/predicts', len(results_list))
         return results_list
-
-    def _kpt_post_process(self,
-                          results,
-                          cfg,
-                          rescale=False,
-                          with_nms=True,
-                          img_meta=None):
-        if rescale:
-            assert img_meta.get('scale_factor') is not None
-            scale_factor = [1 / s for s in img_meta['scale_factor']]
-            results.keypoints = Keypoints._kpt_rescale(results.keypoints,
-                                                       scale_factor)
-        return results
 
     def _kpts2_bbox(self, kpts:Tensor, with_vis=True)->Tensor:
         """Convert keypoints to bounding boxes.
@@ -457,6 +468,7 @@ class YOLOXKptOnlyHead(YOLOv5Head):
             self,
             kpt_preds: Sequence[Tensor],
             vis_preds: Sequence[Tensor],
+            objectnesses: Sequence[Tensor],
             batch_gt_instances: Sequence[InstanceData],
             batch_img_metas: Sequence[dict],
             batch_gt_instances_ignore: OptInstanceList = None) -> dict:
@@ -506,16 +518,18 @@ class YOLOXKptOnlyHead(YOLOv5Head):
                                                  self.num_keypoints)
             for vis_pred in vis_preds
         ]
-
+        flatten_objectness = [
+            objectness.permute(0, 2, 3, 1).reshape(num_imgs, -1)
+            for objectness in objectnesses
+        ]
         flatten_priors = torch.cat(mlvl_priors)
         flatten_kpt_preds = torch.cat(flatten_kpt_preds, dim=1)
         flatten_kpts = self.kpt_coder.decode(flatten_priors[..., :2],
                                              flatten_kpt_preds,
                                              flatten_priors[..., 2])
+        flatten_bboxes = self._kpts2_bbox(flatten_kpts)
         flatten_vis_preds = torch.cat(flatten_vis_preds, dim=1)
-
-        # use keypoints visibility as objectness preds
-        flatten_objectness = flatten_vis_preds.max(dim=-1)[0]
+        flatten_objectness = torch.cat(flatten_objectness, dim=1)
 
         (pos_masks, cls_targets, obj_targets, bbox_targets, kpt_targets,
          vis_targets, bbox_aux_target, num_fg_imgs) = multi_apply(
@@ -543,9 +557,10 @@ class YOLOXKptOnlyHead(YOLOv5Head):
         if self.use_bbox_aux:
             bbox_aux_target = torch.cat(bbox_aux_target, 0)
 
-        # loss_obj = self.loss_obj(flatten_objectness.view(-1, 1),
-        #                          obj_targets) / num_total_samples
         if num_pos > 0:
+            loss_bbox = self.loss_bbox(
+                flatten_bboxes.view(-1, 4)[pos_masks],
+                bbox_targets) / num_total_samples
             # combine kpt and vis for oks loss to N x K x 3.
             flatten_kpt_vis_preds = torch.cat(
                 [flatten_kpts, flatten_vis_preds[..., None]], dim=-1)
@@ -570,10 +585,17 @@ class YOLOXKptOnlyHead(YOLOv5Head):
             # https://github.com/open-mmlab/mmdetection/issues/7298
             loss_kpt = flatten_kpt_preds.sum() * 0
             loss_vis = flatten_vis_preds.sum() * 0
+            loss_bbox = flatten_bboxes.sum() * 0
+
+        loss_obj = self.loss_obj(flatten_objectness.view(-1, 1),
+                                 obj_targets) / num_total_samples
 
         loss_dict = dict(
+            loss_bbox=loss_bbox,
             loss_kpt=loss_kpt,
-            loss_vis=loss_vis)
+            loss_vis=loss_vis,
+            loss_obj=loss_obj)
+        
 
         if self.use_bbox_aux:
             if num_pos > 0:
@@ -685,6 +707,9 @@ class YOLOXKptOnlyHead(YOLOv5Head):
                                               gt_instances)
         pos_inds = sampling_result.pos_inds
         num_pos_per_img = pos_inds.size(0)
+        message_hub = MessageHub.get_current_instance()
+        message_hub.update_scalar('train/num_pos_per_img', num_pos_per_img)
+        message_hub.update_scalar('train/num_gts', num_gts)
 
         pos_ious = assign_result.max_overlaps[pos_inds]
         # IOU aware classification score

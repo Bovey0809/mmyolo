@@ -15,7 +15,7 @@ from mmpose.datasets.datasets.utils import parse_pose_metainfo
 from terminaltables import AsciiTable
 from xtcocotools.coco import COCO
 from xtcocotools.cocoeval import COCOeval
-
+from mmengine.logging import MessageHub
 
 from mmyolo.registry import METRICS
 
@@ -140,6 +140,8 @@ class CocoMetric(MMPosCocoMetric):
             # perform nms
             valid_kpts[img_id] = instances
         # convert results to coco style and dump into a json file
+        message_hub = MessageHub.get_current_instance()
+        message_hub.update_scalar("val/valid_kpts", len(valid_kpts))
         self.results2json(valid_kpts, outfile_prefix=outfile_prefix)
 
         # only format the results without doing quantitative evaluation

@@ -223,11 +223,11 @@ val_evaluator = [
         proposal_nums=(100, 1, 10),
         ann_file=data_root + 'annotations/person_keypoints_val2017_kpt2bbox.json',
         metric=['bbox']),
-    # dict(
-    #     type='CocoMetric',
-    #     ann_file=data_root + 'annotations/person_keypoints_val2017_1256.json',
-    #     score_mode='bbox',
-    #     nms_mode='none')
+    dict(
+        type='CocoMetric',
+        ann_file=data_root + 'annotations/person_keypoints_val2017.json',
+        score_mode='bbox',
+        nms_mode='none')
 ]
 
 test_evaluator = val_evaluator

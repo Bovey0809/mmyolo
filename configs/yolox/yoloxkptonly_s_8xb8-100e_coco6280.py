@@ -9,7 +9,7 @@ img_scale = (640, 640)  # width, height
 deepen_factor = 0.33
 widen_factor = 0.5
 
-save_epoch_intervals = 10
+save_epoch_intervals = 1
 train_batch_size_per_gpu = 32
 # NOTE: for debugging set to 0
 train_num_workers = 4
@@ -223,11 +223,11 @@ val_evaluator = [
         proposal_nums=(100, 1, 10),
         ann_file=data_root + 'annotations/person_keypoints_val2017_1256_kpt2bbox.json',
         metric=['bbox']),
-    # dict(
-    #     type='CocoMetric',
-    #     ann_file=data_root + 'annotations/person_keypoints_val2017_1256.json',
-    #     score_mode='bbox',
-    #     nms_mode='none')
+    dict(
+        type='CocoMetric',
+        ann_file=data_root + 'annotations/person_keypoints_val2017_1256.json',
+        score_mode='bbox',
+        nms_mode='none')
 ]
 
 test_evaluator = val_evaluator
@@ -273,7 +273,7 @@ param_scheduler = [
     )
 ]
 
-vis_backends = [dict(type='WandbVisBackend')]
+vis_backends = [dict(type='WandbVisBackend'), dict(type='LocalVisBackend')]
 
 custom_hooks = [
     dict(
@@ -302,3 +302,5 @@ auto_scale_lr = dict(base_batch_size=8*train_batch_size_per_gpu)
 val_cfg = dict(type='ValLoop')
 test_cfg = dict(type='TestLoop')
 # load_from="mmyoloxs.pt"
+load_from="/home/houbowei/mmyolo/work_dirs/yoloxkptonly_s_8xb32-300e_coco/epoch_300.pth"
+seed=0

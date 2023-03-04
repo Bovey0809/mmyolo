@@ -80,7 +80,8 @@
         // "configs/yolox/yoloxkpt_s_8xb8-300e_coco_mini_debug.py",
         // "work_dirs/yoloxkpt_s_8xb8-300e_coco/yoloxkpt_s_8xb8-300e_coco.py",
         // "work_dirs/yoloxkpt_s_8xb8-300e_coco/best_coco/bbox_mAP_epoch_100.pth",
-        "/home/houbowei/yolox-pose/YOLOX_outputs/kpt_anno_separate_head/best_ckpt_mmyolo.pth"
+        "/home/houbowei/mmyolo/work_dirs/yoloxkptonly_s_8xb32-300e_coco/epoch_300.pth"
+        // "/home/houbowei/yolox-pose/YOLOX_outputs/kpt_anno_separate_head/best_ckpt_mmyolo.pth"
         // "--show",
         // "--json-prefix",
         // "bug"
@@ -112,7 +113,6 @@
         "~/yolox-pose/YOLOX_outputs/kpt_anno_separate_head/best_ckpt.pth",
         "--dst",
         "~/yolox-pose/YOLOX_outputs/kpt_anno_separate_head/best_ckpt_mmyolo.pth",
-        
       ]
     }
   ]
