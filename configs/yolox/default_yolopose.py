@@ -1,3 +1,4 @@
+__base__ = "../_base_/datasets/coco.py"
 default_scope = 'mmyolo'
 
 optim_wrapper = dict(

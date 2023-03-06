@@ -15,7 +15,13 @@ from mmdet.datasets.transforms import PackDetInputs, RandomAffine, RandomFlip
 from mmdet.datasets.transforms import Resize as MMDET_Resize
 from mmdet.structures.bbox import (HorizontalBoxes, autocast_box_type,
                                    get_box_type)
+from mmdet.structures.mask import PolygonMasks
+from mmengine.structures import InstanceData, PixelData
+from mmdet.structures import DetDataSample
+from mmdet.structures.bbox import BaseBoxes
+
 from numpy import random
+from ..utils import Keypoints
 
 from mmyolo.registry import TRANSFORMS
 # TODO: Waiting for MMCV support

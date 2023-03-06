@@ -76,9 +76,7 @@ class YOLOv5PoseCocoDataset(BatchShapePolicyDataset, CocoDataset):
     """
     def __init__(self, metainfo, *args, batch_shapes_cfg: Optional[dict] = None, **kwargs):
         super().__init__(*args, batch_shapes_cfg=batch_shapes_cfg, **kwargs)
-        METAINFO: dict = dict(from_file=metainfo)
-        pose_metainfo = parse_pose_metainfo(METAINFO)
-        self.METAINFO = self.METAINFO.update(pose_metainfo)
+        self.METAINFO = self.metainfo.update(metainfo)
 
     def parse_data_info(self, raw_data_info: dict) -> Union[dict, List[dict]]:
         """Parse raw annotation to target format.

@@ -22,7 +22,7 @@ class OksLoss(nn.Module):
         self.l2_loss = nn.MSELoss(reduction="none")
         if isinstance(dataset_info, dict):
             self.dataset_info = dataset_info
-        if isinstance(dataset_info, str):
+        elif isinstance(dataset_info, str):
             _metainfo = dict(from_file=dataset_info)
             self.dataset_info = parse_pose_metainfo(_metainfo)
         else:
