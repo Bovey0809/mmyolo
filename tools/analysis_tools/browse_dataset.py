@@ -16,6 +16,7 @@ from mmengine.utils import ProgressBar
 from mmengine.visualization import Visualizer
 
 from mmyolo.registry import DATASETS, VISUALIZERS
+from mmyolo.utils import register_all_modules
 from mmpose.structures import PoseDataSample
 
 

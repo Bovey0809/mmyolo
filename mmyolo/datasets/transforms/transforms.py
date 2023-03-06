@@ -10,7 +10,9 @@ import torch
 from mmcv.transforms import BaseTransform, Compose, to_tensor
 from mmcv.transforms.utils import cache_randomness
 from mmdet.datasets.transforms import FilterAnnotations
+from mmdet.datasets.transforms import FilterAnnotations
 from mmdet.datasets.transforms import LoadAnnotations as MMDET_LoadAnnotations
+from mmdet.datasets.transforms import PackDetInputs, RandomAffine, RandomFlip
 from mmdet.datasets.transforms import PackDetInputs, RandomAffine, RandomFlip
 from mmdet.datasets.transforms import Resize as MMDET_Resize
 from mmdet.structures.bbox import (HorizontalBoxes, autocast_box_type,
@@ -121,6 +123,12 @@ class YOLOv5KeepRatioResize(MMDET_Resize):
             results['img_shape'] = image.shape[:2]
             results['scale_factor'] = scale_factor
 
+@TRANSFORMS.register_module()
+class YOLOPoseResize(MMDET_Resize):
+    def transform(self, results: dict) -> dict:
+        super().transform(results)
+        self._resize_keypoints(results)
+        return results
 @TRANSFORMS.register_module()
 class YOLOPoseResize(MMDET_Resize):
     def transform(self, results: dict) -> dict:

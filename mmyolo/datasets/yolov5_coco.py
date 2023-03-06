@@ -2,6 +2,9 @@
 import os.path as osp
 from typing import Any, List, Optional, Union
 from mmpose.datasets.datasets.utils import parse_pose_metainfo
+import os.path as osp
+from typing import Any, List, Optional, Union
+from mmpose.datasets.datasets.utils import parse_pose_metainfo
 from mmdet.datasets import BaseDetDataset, CocoDataset
 import numpy as np
 
