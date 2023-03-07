@@ -3,7 +3,6 @@ import argparse
 import os
 import os.path as osp
 
-from mmdet.engine.hooks.utils import trigger_visualization_hook
 from mmengine.config import Config, ConfigDict, DictAction
 from mmengine.evaluator import DumpResults
 from mmengine.runner import Runner
@@ -110,8 +109,8 @@ def main():
                 cfg.merge_from_dict(cfg_json)
             elif isinstance(cfg['test_evaluator'], list):
                 cfg_json = {
-                    "format_only": True,
-                    "outfile_prefix": args.json_prefix
+                    'format_only': True,
+                    'outfile_prefix': args.json_prefix
                 }
                 for cfg_eval in cfg['test_evaluator']:
                     cfg_eval.update(cfg_json)

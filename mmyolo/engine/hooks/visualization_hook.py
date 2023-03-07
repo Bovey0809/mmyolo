@@ -1,6 +1,6 @@
 # Copyright (c) OpenMMLab. All rights reserved.
-from mmengine.hooks.naive_visualization_hook import NaiveVisualizationHook
 from mmengine.hooks import Hook
+
 from mmyolo.registry import HOOKS
 
 

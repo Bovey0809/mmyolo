@@ -1,12 +1,9 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import os.path as osp
 from typing import Any, List, Optional, Union
-from mmpose.datasets.datasets.utils import parse_pose_metainfo
-import os.path as osp
-from typing import Any, List, Optional, Union
-from mmpose.datasets.datasets.utils import parse_pose_metainfo
-from mmdet.datasets import BaseDetDataset, CocoDataset
+
 import numpy as np
+from mmdet.datasets import BaseDetDataset, CocoDataset
 
 from ..registry import DATASETS, TASK_UTILS
 
@@ -77,7 +74,12 @@ class YOLOv5PoseCocoDataset(BatchShapePolicyDataset, CocoDataset):
     We only add `BatchShapePolicy` function compared with CocoDataset. See
     `mmyolo/datasets/utils.py#BatchShapePolicy` for details
     """
-    def __init__(self, metainfo, *args, batch_shapes_cfg: Optional[dict] = None, **kwargs):
+
+    def __init__(self,
+                 metainfo,
+                 *args,
+                 batch_shapes_cfg: Optional[dict] = None,
+                 **kwargs):
         super().__init__(*args, batch_shapes_cfg=batch_shapes_cfg, **kwargs)
         self.METAINFO = self.metainfo.update(metainfo)
 

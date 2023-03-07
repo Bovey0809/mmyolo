@@ -1,25 +1,24 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import copy
 from typing import List, Optional, Sequence, Tuple, Union
-import numpy as np
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from mmcv.cnn import ConvModule, DepthwiseSeparableConvModule
 from mmdet.models.task_modules.samplers import PseudoSampler
-from mmdet.models.utils import multi_apply, filter_scores_and_topk
+from mmdet.models.utils import filter_scores_and_topk, multi_apply
 from mmdet.structures.bbox import bbox_xyxy_to_cxcywh
 from mmdet.utils import (ConfigType, OptConfigType, OptInstanceList,
                          OptMultiConfig, reduce_mean)
+from mmengine.config import ConfigDict
 from mmengine.model import BaseModule, bias_init_with_prob
 from mmengine.structures import InstanceData
 from torch import Tensor
-from mmengine.config import ConfigDict
 
+from mmyolo.datasets.utils import Keypoints
 from mmyolo.registry import MODELS, TASK_UTILS
 from .yolov5_head import YOLOv5Head
-from mmyolo.datasets.utils import Keypoints
 
 
 @MODELS.register_module()
@@ -117,21 +116,19 @@ class YOLOXKptHeadModule(BaseModule):
             self.multi_level_reg_convs.append(self._build_stacked_convs())
             self.multi_level_kpt_convs.append(self._build_kpt_stacked_convs())
 
-            conv_cls, conv_reg, conv_obj, conv_kpt, conv_vis = self._build_predictor(
-            )
+            c_cls, c_reg, c_obj, c_kpt, c_vis = self._build_predictor()
 
-            self.multi_level_conv_cls.append(conv_cls)
-            self.multi_level_conv_reg.append(conv_reg)
-            self.multi_level_conv_obj.append(conv_obj)
-            self.multi_level_conv_kpt.append(conv_kpt)
-            self.multi_level_conv_vis.append(conv_vis)
+            self.multi_level_conv_cls.append(c_cls)
+            self.multi_level_conv_reg.append(c_reg)
+            self.multi_level_conv_obj.append(c_obj)
+            self.multi_level_conv_kpt.append(c_kpt)
+            self.multi_level_conv_vis.append(c_vis)
 
     def _build_kpt_stacked_convs(self) -> nn.Sequential:
         """Initialize conv layers of kpt head.
-        
-        Kpt head convs are usually different from cls and reg head convs.
-        It's deeper.
 
+        Kpt head convs are usually different from cls and reg head convs. It's
+        deeper.
         """
         conv = DepthwiseSeparableConvModule \
             if self.use_depthwise else ConvModule
@@ -334,24 +331,29 @@ class YOLOXKptHead(YOLOv5Head):
                         cfg: Optional[ConfigDict] = None,
                         rescale: bool = True,
                         with_nms: bool = True) -> List[InstanceData]:
-        """
-        predict_by_feat predict feature from feature maps.
+        """predict_by_feat predict feature from feature maps.
 
-        head module outputs are feature maps, so we need to decode them to get the final prediction.
+        head module outputs are feature maps, so we need to decode them to get
+        the final prediction.
 
         Args:
             cls_scores (List[Tensor]): feature maps of classification.
             bbox_preds (List[Tensor]): feature maps of localization.
-            objectnesses (Optional[List[Tensor]], optional): feature maps of objectness. Defaults to None.
-            kpt_preds (Optional[List[Tensor]], optional): feature maps of keypoints. Defaults to None.
-            vis_preds (Optional[List[Tensor]], optional): feature maps of keypoints visibility. Defaults to None.
-            batch_img_metas (Optional[List[dict]], optional): meta info for images. Defaults to None.
-            cfg (Optional[ConfigDict], optional): from config file "model.test_cfg". Defaults to None.
-            rescale (bool, optional): whether rescale back to original images. Defaults to True.
-            with_nms (bool, optional): whether use nms. Defaults to True.
+            objectnesses (Optional[List[Tensor]], optional): feature maps of
+                object.
+            kpt_preds (Optional[List[Tensor]], optional): feature maps of
+                keypoints.
+            vis_preds (Optional[List[Tensor]], optional): feature maps of
+                kpts visible.
+            batch_img_metas (Optional[List[dict]], optional): meta info for
+                images.
+            cfg (Optional[ConfigDict]): from config file "model.test_cfg".
+            rescale (bool, optional): whether rescale back to original images.
+            with_nms (bool, optional): whether use nms.
 
         Returns:
-            List[InstanceData]: prediction results, including boxes, labels, scores, keypoints, keypoints visibility.
+            List[InstanceData]: prediction results, including boxes, labels,
+            scores, keypoints, keypoints visibility.
         """
         assert len(cls_scores) == len(bbox_preds) == len(kpt_preds) == len(
             vis_preds)
@@ -437,11 +439,8 @@ class YOLOXKptHead(YOLOv5Head):
                               flatten_decoded_kpts, flatten_vis_preds):
             ori_shape = img_meta['ori_shape']
             scale_factor = img_meta['scale_factor']
-            if 'pad_param' in img_meta:
-                pad_param = img_meta['pad_param']
-            else:
-                pad_param = None
-
+            pad_param = img_meta[
+                'pad_param'] if 'pad_param' in img_meta else None
             score_thr = cfg.get('score_thr', -1)
             # yolox_style does not require the following operations
             if objectness is not None and score_thr > 0 and not cfg.get(
@@ -466,7 +465,7 @@ class YOLOXKptHead(YOLOv5Head):
                 continue
 
             nms_pre = cfg.get('nms_pre', 100000)
-            if cfg.multi_label is False:
+            if not cfg.multi_label:
                 scores, labels = scores.max(1, keepdim=True)
                 scores, _, keep_idxs, results = filter_scores_and_topk(
                     scores,
@@ -660,15 +659,13 @@ class YOLOXKptHead(YOLOv5Head):
                 flatten_bboxes.view(-1, 4)[pos_masks],
                 bbox_targets) / num_total_samples
             # combine kpt and vis for oks loss to N x K x 3.
-            flatten_kpt_vis_preds = torch.cat([flatten_kpts, flatten_vis_preds[..., None]], dim=-1)
-            kpt_vis_targets = torch.cat([kpt_targets, vis_targets[..., None]], dim=-1)
+            torch.cat([flatten_kpts, flatten_vis_preds[..., None]], dim=-1)
+            torch.cat([kpt_targets, vis_targets[..., None]], dim=-1)
 
             # filter by keypoint visibility.
-            # flatten_kpt_vis_preds = flatten_kpt_vis_preds[pos_masks][kpt_mask]
-            # kpt_vis_targets = kpt_vis_targets[pos_masks][kpt_mask]
-            loss_kpt = self.loss_kpt(flatten_kpts.view(-1, self.num_keypoints, 2)[pos_masks], kpt_targets, kpt_mask, bbox_targets)
-            # loss_kpt = self.loss_kpt(
-            #     flatten_kpt_vis_preds.view(-1, self.num_keypoints, 3)[pos_masks], kpt_vis_targets, kpt_mask)
+            loss_kpt = self.loss_kpt(
+                flatten_kpts.view(-1, self.num_keypoints, 2)[pos_masks],
+                kpt_targets, kpt_mask, bbox_targets)
             loss_vis = self.loss_cls(
                 flatten_vis_preds.view(-1, self.num_keypoints)[pos_masks],
                 kpt_mask.float()) / kpt_mask.sum()
@@ -718,11 +715,11 @@ class YOLOXKptHead(YOLOv5Head):
         if gt_kpts.shape[0] == 0:
             kpt_targets = gt_kpts.new_zeros((0, self.num_keypoints * 2))
             vis_targets = gt_kpts.new_zeros((0, self.num_keypoints))
-            return kpt_targets, vis_targets
         else:
             kpt_targets = gt_kpts[..., :2]
             vis_targets = gt_kpts[..., 2]
-            return kpt_targets, vis_targets
+
+        return kpt_targets, vis_targets
 
     @torch.no_grad()
     def _get_targets_single(

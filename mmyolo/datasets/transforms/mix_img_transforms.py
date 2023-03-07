@@ -11,8 +11,7 @@ from mmdet.structures.bbox import autocast_box_type
 from mmengine.dataset import BaseDataset
 from mmengine.dataset.base_dataset import Compose
 from numpy import random
-from mmpose.structures.keypoint import flip_keypoints
-import torch
+
 from mmyolo.registry import TRANSFORMS
 from ..utils import Keypoints
 
@@ -1151,9 +1150,11 @@ class YOLOXMixUp(BaseMixImageTransform):
         repr_str += f'bbox_clip_border={self.bbox_clip_border})'
         return repr_str
 
+
 @TRANSFORMS.register_module()
 class YOLOXMixUpPose(YOLOXMixUp):
     """YOLOX MixUp data augmentation for pose estimation."""
+
     def mix_img_transform(self, results: dict) -> dict:
         """YOLOX MixUp transform function.
 
@@ -1232,12 +1233,18 @@ class YOLOXMixUpPose(YOLOXMixUp):
                                      direction='horizontal')
         # adjust keypoints
         retrieve_gt_keypoints = retrieve_results['gt_keypoints']
-        retrieve_gt_keypoints_visible = retrieve_results['gt_keypoints_visible']
-        retrieve_gt_keypoints = Keypoints._kpt_rescale(retrieve_gt_keypoints, [scale_ratio, scale_ratio])
+        retrieve_gt_keypoints_visible = retrieve_results[
+            'gt_keypoints_visible']
+        retrieve_gt_keypoints = Keypoints._kpt_rescale(
+            retrieve_gt_keypoints, [scale_ratio, scale_ratio])
         if self.bbox_clip_border:
-            retrieve_gt_keypoints_visible = Keypoints._kpt_clip(retrieve_gt_keypoints, retrieve_gt_keypoints_visible, [origin_h, origin_w])
+            retrieve_gt_keypoints_visible = Keypoints._kpt_clip(
+                retrieve_gt_keypoints, retrieve_gt_keypoints_visible,
+                [origin_h, origin_w])
         if is_filp:
-            retrieve_gt_keypoints = Keypoints._kpt_flip(retrieve_gt_keypoints, [origin_h, origin_w], direction='horizontal')
+            retrieve_gt_keypoints = Keypoints._kpt_flip(
+                retrieve_gt_keypoints, [origin_h, origin_w],
+                direction='horizontal')
 
         # 7. filter
         cp_retrieve_gt_bboxes = retrieve_gt_bboxes.clone()
@@ -1246,10 +1253,14 @@ class YOLOXMixUpPose(YOLOXMixUp):
             cp_retrieve_gt_bboxes.clip_([target_h, target_w])
 
         cp_retrieve_gt_keypoints = np.copy(retrieve_gt_keypoints)
-        cp_retrieve_gt_keypoints = Keypoints._kpt_translate(cp_retrieve_gt_keypoints, [-x_offset, -y_offset])
+        cp_retrieve_gt_keypoints = Keypoints._kpt_translate(
+            cp_retrieve_gt_keypoints, [-x_offset, -y_offset])
         if self.bbox_clip_border:
-            cp_retrieve_gt_keypoints_visible = np.copy(retrieve_gt_keypoints_visible)
-            cp_retrieve_gt_keypoints_visible = Keypoints._kpt_clip(cp_retrieve_gt_keypoints, retrieve_gt_keypoints_visible, [target_h, target_w])
+            cp_retrieve_gt_keypoints_visible = np.copy(
+                retrieve_gt_keypoints_visible)
+            cp_retrieve_gt_keypoints_visible = Keypoints._kpt_clip(
+                cp_retrieve_gt_keypoints, retrieve_gt_keypoints_visible,
+                [target_h, target_w])
 
         # 8. mix up
         mixup_img = 0.5 * ori_img + 0.5 * padded_cropped_img
@@ -1267,7 +1278,9 @@ class YOLOXMixUpPose(YOLOXMixUp):
         mixup_gt_keypoints = np.concatenate(
             (results['gt_keypoints'], cp_retrieve_gt_keypoints), axis=0)
         mixup_gt_keypoints_visible = np.concatenate(
-            (results['gt_keypoints_visible'], cp_retrieve_gt_keypoints_visible), axis=0)
+            (results['gt_keypoints_visible'],
+             cp_retrieve_gt_keypoints_visible),
+            axis=0)
 
         if not self.bbox_clip_border:
             # remove outside bbox
@@ -1279,8 +1292,11 @@ class YOLOXMixUpPose(YOLOXMixUp):
 
             # remove outside keypoints
             mixup_gt_keypoints = mixup_gt_keypoints[inside_inds]
-            mixup_gt_keypoints_visible = mixup_gt_keypoints_visible[inside_inds]
-            mixup_gt_keypoints_visible = Keypoints._kpt_clip(mixup_gt_keypoints, mixup_gt_keypoints_visible, [target_h, target_w])
+            mixup_gt_keypoints_visible = mixup_gt_keypoints_visible[
+                inside_inds]
+            mixup_gt_keypoints_visible = Keypoints._kpt_clip(
+                mixup_gt_keypoints, mixup_gt_keypoints_visible,
+                [target_h, target_w])
 
         results['img'] = mixup_img.astype(np.uint8)
         results['img_shape'] = mixup_img.shape
@@ -1292,8 +1308,10 @@ class YOLOXMixUpPose(YOLOXMixUp):
 
         return results
 
+
 @TRANSFORMS.register_module()
 class MosaicKeypoints(Mosaic):
+
     def mix_img_transform(self, results: dict) -> dict:
         """Mixed image data transformation.
 
@@ -1367,8 +1385,10 @@ class MosaicKeypoints(Mosaic):
 
             # TODO: kps adjust coordinate
             gt_keypoints_i = results_patch['gt_keypoints']
-            gt_keypoints_i = Keypoints._kpt_rescale(gt_keypoints_i,[scale_ratio_i, scale_ratio_i])
-            gt_keypoints_i = Keypoints._kpt_translate(gt_keypoints_i,[padw, padh])
+            gt_keypoints_i = Keypoints._kpt_rescale(
+                gt_keypoints_i, [scale_ratio_i, scale_ratio_i])
+            gt_keypoints_i = Keypoints._kpt_translate(gt_keypoints_i,
+                                                      [padw, padh])
             mosaic_keypoints.append(gt_keypoints_i)
 
             gt_keypoints_visible_i = results_patch['gt_keypoints_visible']
@@ -1381,7 +1401,9 @@ class MosaicKeypoints(Mosaic):
         mosaic_keypoints = np.concatenate(mosaic_keypoints, 0)
         mosaic_keypoints_visible = np.concatenate(mosaic_keypoints_visible, 0)
 
-        mosaic_keypoints_visible = Keypoints._kpt_clip(mosaic_keypoints, mosaic_keypoints_visible, [2 * img_scale_h, 2 * img_scale_w])
+        mosaic_keypoints_visible = Keypoints._kpt_clip(
+            mosaic_keypoints, mosaic_keypoints_visible,
+            [2 * img_scale_h, 2 * img_scale_w])
 
         if self.bbox_clip_border:
             mosaic_bboxes.clip_([2 * img_scale_h, 2 * img_scale_w])
@@ -1394,7 +1416,8 @@ class MosaicKeypoints(Mosaic):
             mosaic_ignore_flags = mosaic_ignore_flags[inside_inds]
 
             # remove outside keypoints
-            inside_inds = Keypoints._kpt_is_inside(mosaic_keypoints, [2 * img_scale_h, 2 * img_scale_w])
+            inside_inds = Keypoints._kpt_is_inside(
+                mosaic_keypoints, [2 * img_scale_h, 2 * img_scale_w])
             mosaic_keypoints = mosaic_keypoints[inside_inds]
             mosaic_keypoints_visible = mosaic_keypoints_visible[inside_inds]
 

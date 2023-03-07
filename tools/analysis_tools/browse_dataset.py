@@ -16,8 +16,6 @@ from mmengine.utils import ProgressBar
 from mmengine.visualization import Visualizer
 
 from mmyolo.registry import DATASETS, VISUALIZERS
-from mmyolo.utils import register_all_modules
-from mmpose.structures import PoseDataSample
 
 
 # TODO: Support for printing the change in key of results
@@ -223,8 +221,8 @@ def main():
                 datasample.gt_instances = gt_instances
 
             # Visualize keypoints
-            gt_keypoints = datasample.get("gt_keypoints", None)
-            gt_keypoints_visible = datasample.get("gt_keypoints_visible", None)
+            gt_keypoints = datasample.get('gt_keypoints', None)
+            gt_keypoints_visible = datasample.get('gt_keypoints_visible', None)
             if gt_keypoints is not None:
                 gt_instances.keypoints = gt_keypoints
                 gt_instances.keypoints_visible = gt_keypoints_visible

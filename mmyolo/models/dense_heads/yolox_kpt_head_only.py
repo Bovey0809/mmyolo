@@ -1,27 +1,26 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import copy
 from typing import List, Optional, Sequence, Tuple, Union
-import numpy as np
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from mmcv.cnn import ConvModule, DepthwiseSeparableConvModule
 from mmdet.models.task_modules.samplers import PseudoSampler
-from mmdet.models.utils import multi_apply, filter_scores_and_topk
+from mmdet.models.utils import filter_scores_and_topk, multi_apply
 from mmdet.structures.bbox import bbox_xyxy_to_cxcywh
 from mmdet.utils import (ConfigType, OptConfigType, OptInstanceList,
                          OptMultiConfig, reduce_mean)
+from mmengine.config import ConfigDict
+from mmengine.logging import MessageHub
 from mmengine.model import BaseModule, bias_init_with_prob
 from mmengine.structures import InstanceData
 from torch import Tensor
-from mmengine.config import ConfigDict
-from mmengine.logging import MessageHub
 from torchvision.ops import batched_nms
 
 from mmyolo.registry import MODELS, TASK_UTILS
 from .yolov5_head import YOLOv5Head
-from mmyolo.datasets.utils import Keypoints
+
 
 @MODELS.register_module()
 class YOLOXKptOnlyHeadModule(BaseModule):
@@ -118,9 +117,9 @@ class YOLOXKptOnlyHeadModule(BaseModule):
 
     def _build_kpt_stacked_convs(self) -> nn.Sequential:
         """Initialize conv layers of kpt head.
-        Kpt head convs are usually different from cls and reg head convs.
-        It's deeper.
 
+        Kpt head convs are usually different from cls and reg head convs. It's
+        deeper.
         """
         conv = DepthwiseSeparableConvModule \
             if self.use_depthwise else ConvModule
@@ -157,7 +156,8 @@ class YOLOXKptOnlyHeadModule(BaseModule):
         # Use prior in model initialization to improve stability
         super().init_weights()
         bias_init = bias_init_with_prob(0.01)
-        for conv_vis, conv_obj in zip(self.multi_level_conv_vis, self.multi_level_conv_obj):
+        for conv_vis, conv_obj in zip(self.multi_level_conv_vis,
+                                      self.multi_level_conv_obj):
             conv_vis.bias.data.fill_(bias_init)
             conv_obj.bias.data.fill_(bias_init)
 
@@ -174,12 +174,12 @@ class YOLOXKptOnlyHeadModule(BaseModule):
 
         return multi_apply(self.forward_single, x, self.multi_level_kpt_convs,
                            self.multi_level_conv_kpt,
-                           self.multi_level_conv_vis, self.multi_level_conv_obj)
+                           self.multi_level_conv_vis,
+                           self.multi_level_conv_obj)
 
-    def forward_single(
-            self, x: Tensor, kpt_convs: nn.Module, conv_kpt: nn.Module,
-            conv_vis: nn.Module, conv_obj: nn.Module
-    ) -> Tuple[Tensor, Tensor]:
+    def forward_single(self, x: Tensor, kpt_convs: nn.Module,
+                       conv_kpt: nn.Module, conv_vis: nn.Module,
+                       conv_obj: nn.Module) -> Tuple[Tensor, Tensor]:
         """Forward feature of a single scale level."""
         kpt_feat = kpt_convs(x)
         kpt_pred = conv_kpt(kpt_feat)
@@ -228,7 +228,7 @@ class YOLOXKptOnlyHead(YOLOv5Head):
                      use_sigmoid=True,
                      reduction='sum',
                      loss_weight=1.0),
-                loss_obj: ConfigType = dict(
+                 loss_obj: ConfigType = dict(
                      type='mmdet.CrossEntropyLoss',
                      use_sigmoid=True,
                      reduction='sum',
@@ -236,7 +236,7 @@ class YOLOXKptOnlyHead(YOLOv5Head):
                  loss_kpt: ConfigType = dict(
                      type='mmdet.L1Loss', reduction='sum', loss_weight=1.0),
                  loss_bbox_aux: ConfigType = dict(
-                        type='mmdet.L1Loss', reduction='sum', loss_weight=1.0),
+                     type='mmdet.L1Loss', reduction='sum', loss_weight=1.0),
                  train_cfg: OptConfigType = None,
                  test_cfg: OptConfigType = None,
                  init_cfg: OptMultiConfig = None):
@@ -278,24 +278,30 @@ class YOLOXKptOnlyHead(YOLOv5Head):
                         cfg: Optional[ConfigDict] = None,
                         rescale: bool = True,
                         with_nms: bool = True) -> List[InstanceData]:
-        """
-        predict_by_feat predict feature from feature maps.
+        """predict_by_feat predict feature from feature maps.
 
-        head module outputs are feature maps, so we need to decode them to get the final prediction.
+        head module outputs are feature maps, so we need to decode them to get
+        the final prediction.
 
         Args:
             cls_scores (List[Tensor]): feature maps of classification.
             bbox_preds (List[Tensor]): feature maps of localization.
-            objectnesses (Optional[List[Tensor]], optional): feature maps of objectness. Defaults to None.
-            kpt_preds (Optional[List[Tensor]], optional): feature maps of keypoints. Defaults to None.
-            vis_preds (Optional[List[Tensor]], optional): feature maps of keypoints visibility. Defaults to None.
-            batch_img_metas (Optional[List[dict]], optional): meta info for images. Defaults to None.
-            cfg (Optional[ConfigDict], optional): from config file "model.test_cfg". Defaults to None.
-            rescale (bool, optional): whether rescale back to original images. Defaults to True.
-            with_nms (bool, optional): whether use nms. Defaults to True.
+            objectnesses (Optional[List[Tensor]], optional): feature maps of
+                objectness.
+            kpt_preds (Optional[List[Tensor]], optional): feature maps of
+                keypoints.
+            vis_preds (Optional[List[Tensor]], optional): feature maps of
+                kpt visible.
+            batch_img_metas (Optional[List[dict]], optional): meta info for
+                images.
+            cfg (Optional[ConfigDict], optional): from config file
+                "model.test_cfg".
+            rescale (bool, optional): whether rescale back to original images.
+            with_nms (bool, optional): whether use nms.
 
         Returns:
-            List[InstanceData]: prediction results, including boxes, labels, scores, keypoints, keypoints visibility.
+            List[InstanceData]: prediction results, including boxes, labels,
+            scores, keypoints, keypoints visibility.
         """
         assert len(kpt_preds) == len(vis_preds)
         if objectnesses is None:
@@ -431,14 +437,14 @@ class YOLOXKptOnlyHead(YOLOv5Head):
                 cfg.max_per_img = len(results)
             # bbox nms
             if with_nms:
-                keep = batched_nms(results.bboxes, results.scores, labels, score_thr)
+                keep = batched_nms(results.bboxes, results.scores, labels,
+                                   score_thr)
                 results = InstanceData(
                     bboxes=results.bboxes[keep],
                     scores=results.scores[keep],
                     labels=results.labels[keep],
                     keypoints=results.keypoints[keep],
-                    keypoint_scores=results.keypoint_scores[keep]
-                )
+                    keypoint_scores=results.keypoint_scores[keep])
             results.bboxes[:, 0::2].clamp_(0, ori_shape[1])
             results.bboxes[:, 1::2].clamp_(0, ori_shape[0])
             results_list.append(results)
@@ -446,7 +452,7 @@ class YOLOXKptOnlyHead(YOLOv5Head):
         message_hub.update_scalar('test/predicts', len(results_list))
         return results_list
 
-    def _kpts2_bbox(self, kpts:Tensor, with_vis=True)->Tensor:
+    def _kpts2_bbox(self, kpts: Tensor, with_vis=True) -> Tensor:
         """Convert keypoints to bounding boxes.
 
         Args:
@@ -534,9 +540,9 @@ class YOLOXKptOnlyHead(YOLOv5Head):
         (pos_masks, cls_targets, obj_targets, bbox_targets, kpt_targets,
          vis_targets, bbox_aux_target, num_fg_imgs) = multi_apply(
              self._get_targets_single,
-             flatten_priors.unsqueeze(0).repeat(num_imgs, 1, 1), flatten_kpts.detach(),
-             flatten_objectness.detach(), batch_gt_instances, batch_img_metas,
-             batch_gt_instances_ignore)
+             flatten_priors.unsqueeze(0).repeat(num_imgs, 1, 1),
+             flatten_kpts.detach(), flatten_objectness.detach(),
+             batch_gt_instances, batch_img_metas, batch_gt_instances_ignore)
 
         # The experimental results show that 'reduce_mean' can improve
         # performance on the COCO dataset.
@@ -562,19 +568,13 @@ class YOLOXKptOnlyHead(YOLOv5Head):
                 flatten_bboxes.view(-1, 4)[pos_masks],
                 bbox_targets) / num_total_samples
             # combine kpt and vis for oks loss to N x K x 3.
-            flatten_kpt_vis_preds = torch.cat(
-                [flatten_kpts, flatten_vis_preds[..., None]], dim=-1)
-            kpt_vis_targets = torch.cat([kpt_targets, vis_targets[..., None]],
-                                        dim=-1)
+            torch.cat([flatten_kpts, flatten_vis_preds[..., None]], dim=-1)
+            torch.cat([kpt_targets, vis_targets[..., None]], dim=-1)
 
             # filter by keypoint visibility.
-            # flatten_kpt_vis_preds = flatten_kpt_vis_preds[pos_masks][kpt_mask]
-            # kpt_vis_targets = kpt_vis_targets[pos_masks][kpt_mask]
             loss_kpt = self.loss_kpt(
                 flatten_kpts.view(-1, self.num_keypoints, 2)[pos_masks],
                 kpt_targets, kpt_mask, bbox_targets)
-            # loss_kpt = self.loss_kpt(
-            #     flatten_kpt_vis_preds.view(-1, self.num_keypoints, 3)[pos_masks], kpt_vis_targets, kpt_mask)
             loss_vis = self.loss_cls(
                 flatten_vis_preds.view(-1, self.num_keypoints)[pos_masks],
                 kpt_mask.float()) / kpt_mask.sum()
@@ -595,12 +595,12 @@ class YOLOXKptOnlyHead(YOLOv5Head):
             loss_kpt=loss_kpt,
             loss_vis=loss_vis,
             loss_obj=loss_obj)
-        
 
         if self.use_bbox_aux:
             if num_pos > 0:
                 loss_bbox_aux = self.loss_bbox_aux(
-                    flatten_kpt_preds.view(-1, self.num_keypoints, 2)[pos_masks],
+                    flatten_kpt_preds.view(-1, self.num_keypoints,
+                                           2)[pos_masks],
                     kpt_targets) / num_total_samples
             else:
                 # Avoid cls and reg branch not participating in the gradient
@@ -694,7 +694,6 @@ class YOLOXKptOnlyHead(YOLOv5Head):
 
         scores = objectness.unsqueeze(1).sigmoid()
         decoded_bbox = self._kpts2_bbox(decoded_kpts, with_vis=False)
-
 
         pred_instances = InstanceData(
             bboxes=decoded_bbox, scores=scores, priors=offset_priors)

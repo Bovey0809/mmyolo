@@ -1,21 +1,14 @@
-import datetime
-import itertools
+# Copyright (c) OpenMMLab. All rights reserved.
 import os.path as osp
 import tempfile
 from collections import OrderedDict, defaultdict
-from typing import Dict, List, Optional, Sequence, Union
+from typing import Dict, Optional, Sequence
 
 import numpy as np
-from mmengine.evaluator import BaseMetric
-from mmengine.fileio import FileClient, dump, load
-from mmengine.logging import MMLogger
-from mmpose.evaluation.functional import oks_nms, soft_oks_nms
-from mmpose.evaluation.metrics.coco_metric import CocoMetric as MMPosCocoMetric
+from mmengine.logging import MessageHub, MMLogger
 from mmpose.datasets.datasets.utils import parse_pose_metainfo
-from terminaltables import AsciiTable
-from xtcocotools.coco import COCO
-from xtcocotools.cocoeval import COCOeval
-from mmengine.logging import MessageHub
+from mmpose.evaluation.metrics.coco_metric import CocoMetric as MMPosCocoMetric
+
 from mmyolo.registry import METRICS
 
 
@@ -28,7 +21,8 @@ class CocoMetric(MMPosCocoMetric):
 
     @dataset_meta.setter
     def dataset_meta(self, dataset_meta) -> Optional[dict]:
-        self._dataset_meta = parse_pose_metainfo(dict(from_file="../configs/coco.py"))
+        self._dataset_meta = parse_pose_metainfo(
+            dict(from_file='../configs/coco.py'))
 
     def process(self, data_batch: Sequence[dict],
                 data_samples: Sequence[dict]) -> None:
@@ -127,7 +121,7 @@ class CocoMetric(MMPosCocoMetric):
         # score the prediction results according to `score_mode`
         # and perform NMS according to `nms_mode`
         valid_kpts = defaultdict(list)
-        num_keypoints = self.dataset_meta['num_keypoints']
+        self.dataset_meta['num_keypoints']
         for img_id, instances in kpts.items():
             for instance in instances:
                 # concatenate the keypoint coordinates and scores
@@ -140,7 +134,7 @@ class CocoMetric(MMPosCocoMetric):
             valid_kpts[img_id] = instances
         # convert results to coco style and dump into a json file
         message_hub = MessageHub.get_current_instance()
-        message_hub.update_scalar("val/valid_kpts", len(valid_kpts))
+        message_hub.update_scalar('val/valid_kpts', len(valid_kpts))
         self.results2json(valid_kpts, outfile_prefix=outfile_prefix)
 
         # only format the results without doing quantitative evaluation

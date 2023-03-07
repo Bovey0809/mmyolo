@@ -7,5 +7,6 @@ from .data_preprocessor import (PPYOLOEBatchRandomResize,
 
 __all__ = [
     'YOLOv5DetDataPreprocessor', 'PPYOLOEDetDataPreprocessor',
-    'PPYOLOEBatchRandomResize', 'YOLOXBatchSyncRandomResize', 'YOLOXPoseBatchSyncRandomResize'
+    'PPYOLOEBatchRandomResize', 'YOLOXBatchSyncRandomResize',
+    'YOLOXPoseBatchSyncRandomResize'
 ]

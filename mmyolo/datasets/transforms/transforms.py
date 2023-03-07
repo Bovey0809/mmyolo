@@ -10,22 +10,19 @@ import torch
 from mmcv.transforms import BaseTransform, Compose, to_tensor
 from mmcv.transforms.utils import cache_randomness
 from mmdet.datasets.transforms import FilterAnnotations
-from mmdet.datasets.transforms import FilterAnnotations
 from mmdet.datasets.transforms import LoadAnnotations as MMDET_LoadAnnotations
 from mmdet.datasets.transforms import PackDetInputs, RandomAffine, RandomFlip
-from mmdet.datasets.transforms import PackDetInputs, RandomAffine, RandomFlip
 from mmdet.datasets.transforms import Resize as MMDET_Resize
-from mmdet.structures.bbox import (HorizontalBoxes, autocast_box_type,
-                                   get_box_type)
+from mmdet.structures import DetDataSample
+from mmdet.structures.bbox import (BaseBoxes, HorizontalBoxes,
+                                   autocast_box_type, get_box_type)
 from mmdet.structures.mask import PolygonMasks
 from mmengine.structures import InstanceData, PixelData
-from mmdet.structures import DetDataSample
-from mmdet.structures.bbox import BaseBoxes
-
 from numpy import random
-from ..utils import Keypoints
 
 from mmyolo.registry import TRANSFORMS
+from ..utils import Keypoints
+
 # TODO: Waiting for MMCV support
 TRANSFORMS.register_module(module=Compose, force=True)
 
@@ -123,18 +120,20 @@ class YOLOv5KeepRatioResize(MMDET_Resize):
             results['img_shape'] = image.shape[:2]
             results['scale_factor'] = scale_factor
 
+    def transform(self, results: dict) -> dict:
+        results = super().transform(results)
+        self._resize_keypoints(results)
+        return results
+
+
 @TRANSFORMS.register_module()
 class YOLOPoseResize(MMDET_Resize):
+
     def transform(self, results: dict) -> dict:
         super().transform(results)
         self._resize_keypoints(results)
         return results
-@TRANSFORMS.register_module()
-class YOLOPoseResize(MMDET_Resize):
-    def transform(self, results: dict) -> dict:
-        super().transform(results)
-        self._resize_keypoints(results)
-        return results
+
 
 @TRANSFORMS.register_module()
 class LetterResize(MMDET_Resize):
@@ -311,8 +310,27 @@ class LetterResize(MMDET_Resize):
         if self.clip_object_border:
             results['gt_bboxes'].clip_(results['img_shape'])
 
+    def _resize_keypoints(self, results: dict):
+        """Resize keypoints with ``results['scale_factor']``."""
+        if results.get('gt_keypoints', None) is None:
+            return
+        super()._resize_keypoints(results)
+        if len(results['pad_param']) != 4:
+            return
+        gt_keypoints = Keypoints._kpt_translate(
+            results['gt_keypoints'],
+            (results['pad_param'][2], results['pad_param'][0]))
+        if self.clip_object_border:
+            gt_keypoints_visibility = Keypoints._kpt_clip(
+                gt_keypoints, results['gt_keypoints_visible'],
+                results['img_shape'][:2])
+        results['gt_keypoints'] = gt_keypoints
+        results['gt_keypoints_visible'] = gt_keypoints_visibility
+        return results
+
     def transform(self, results: dict) -> dict:
         results = super().transform(results)
+        results = self._resize_keypoints(results)
         if 'scale_factor_origin' in results:
             scale_factor_origin = results.pop('scale_factor_origin')
             results['scale_factor'] = (results['scale_factor'][0] *
@@ -404,6 +422,7 @@ class LoadAnnotations(MMDET_LoadAnnotations):
             assert self.with_mask, 'Using mask2bbox requires ' \
                                    'with_mask is True.'
         self._mask_ignore_flag = None
+        self.with_keypoints = kwargs.get('with_keypoints', False)
 
     def transform(self, results: dict) -> dict:
         """Function to load multiple types annotations.
@@ -425,6 +444,8 @@ class LoadAnnotations(MMDET_LoadAnnotations):
         else:
             results = super().transform(results)
             self._update_mask_ignore_data(results)
+        if self.with_keypoints:
+            self._load_kps(results)
         return results
 
     def _update_mask_ignore_data(self, results: dict) -> None:
@@ -442,14 +463,6 @@ class LoadAnnotations(MMDET_LoadAnnotations):
                 results['gt_masks']):
             assert len(results['gt_bboxes']) == len(self._mask_ignore_flag)
             results['gt_bboxes'] = results['gt_bboxes'][self._mask_ignore_flag]
-
-    def __init__(self,
-                 with_mask: bool = False,
-                 poly2mask: bool = True,
-                 box_type: str = 'hbox',
-                 **kwargs) -> None:
-        super().__init__(with_mask, poly2mask, box_type, **kwargs)
-        self.with_keypoints = kwargs.get('with_keypoints', False)
 
     def _load_bboxes(self, results: dict):
         """Private function to load bounding box annotations.
@@ -531,18 +544,6 @@ class LoadAnnotations(MMDET_LoadAnnotations):
         gt_masks = PolygonMasks([mask for mask in gt_masks], h, w)
         results['gt_masks'] = gt_masks
 
-    def __repr__(self) -> str:
-        repr_str = self.__class__.__name__
-        repr_str += f'(with_bbox={self.with_bbox}, '
-        repr_str += f'with_label={self.with_label}, '
-        repr_str += f'with_mask={self.with_mask}, '
-        repr_str += f'with_seg={self.with_seg}, '
-        repr_str += f'mask2bbox={self.mask2bbox}, '
-        repr_str += f'poly2mask={self.poly2mask}, '
-        repr_str += f"imdecode_backend='{self.imdecode_backend}', "
-        repr_str += f'file_client_args={self.file_client_args})'
-        return repr_str
-
     def _load_kps(self, results: dict) -> None:
         gt_keypoints = []
         gt_keypoints_visible = []
@@ -557,14 +558,18 @@ class LoadAnnotations(MMDET_LoadAnnotations):
             gt_keypoints_visible, np.float32).reshape(
                 (len(gt_keypoints_visible), -1))
 
-    def transform(self, results: dict) -> dict:
-        super().transform(results)
-        if self.with_keypoints:
-            self._load_kps(results)
-        return results
-
     def __repr__(self) -> str:
-        return super().__repr__() + f', with_keypoints={self.with_keypoints}'
+        repr_str = self.__class__.__name__
+        repr_str += f'(with_bbox={self.with_bbox}, '
+        repr_str += f'with_label={self.with_label}, '
+        repr_str += f'with_mask={self.with_mask}, '
+        repr_str += f'with_seg={self.with_seg}, '
+        repr_str += f'mask2bbox={self.mask2bbox}, '
+        repr_str += f'poly2mask={self.poly2mask}, '
+        repr_str += f"imdecode_backend='{self.imdecode_backend}', "
+        repr_str += f'file_client_args={self.file_client_args})'
+        repr_str += f'with_keypoints={self.with_keypoints})'
+        return repr_str
 
 
 @TRANSFORMS.register_module()
@@ -725,6 +730,15 @@ class YOLOv5RandomAffine(BaseTransform):
                 if 'gt_masks' in results:
                     results['gt_masks'] = PolygonMasks(
                         results['gt_masks'].masks, img_h, img_w)
+            if 'gt_keypoints' in results:
+                keypoints = results['gt_keypoints'][valid_index]
+                keypoints_visible = results['gt_keypoints_visible'][
+                    valid_index]
+                keypoints = Keypoints._kpt_project(keypoints, warp_matrix)
+                keypoints_visible = Keypoints._kpt_clip(
+                    keypoints, keypoints_visible, [height, width])
+                results['gt_keypoints'] = keypoints
+                results['gt_keypoints_visible'] = keypoints_visible
 
             results['gt_bboxes'] = bboxes[valid_index]
             results['gt_bboxes_labels'] = results['gt_bboxes_labels'][
@@ -1648,10 +1662,14 @@ class YOLOPoseRandomAffine(RandomAffine):
             keypoints = results['gt_keypoints'][valid_index]
             keypoints_visible = results['gt_keypoints_visible'][valid_index]
             keypoints = Keypoints._kpt_project(keypoints, warp_matrix)
-            keypoints_visible = Keypoints._kpt_clip(keypoints, keypoints_visible, [height, width])
+            keypoints_visible = Keypoints._kpt_clip(keypoints,
+                                                    keypoints_visible,
+                                                    [height, width])
             results['gt_keypoints'] = keypoints
             results['gt_keypoints_visible'] = keypoints_visible
-            assert len(results['gt_bboxes']) == len(results['gt_keypoints']) == len(results['gt_keypoints_visible'])
+            assert len(results['gt_bboxes']) == len(
+                results['gt_keypoints']) == len(
+                    results['gt_keypoints_visible'])
         return results
 
 
@@ -1683,8 +1701,10 @@ class YOLOPoseRandomFlip(RandomFlip):
 
         # flip keypoints
         if results.get('gt_keypoints', None) is not None:
-            results['gt_keypoints'], results['gt_keypoints_visible'] = Keypoints._kpt_flip(
-                results['gt_keypoints'], results['gt_keypoints_visible'], img_shape, results['flip_direction'])
+            results['gt_keypoints'], results[
+                'gt_keypoints_visible'] = Keypoints._kpt_flip(
+                    results['gt_keypoints'], results['gt_keypoints_visible'],
+                    img_shape, results['flip_direction'])
 
         # record homography matrix for flip
         self._record_homography_matrix(results)
@@ -1730,7 +1750,7 @@ class YOLOPoseFilterAnnotations(FilterAnnotations):
             # gt_keypoints = results['gt_keypoints']
             gt_keypoints_visible = results['gt_keypoints_visible']
             tests.append(
-                (gt_keypoints_visible.sum(axis=-1) >= self.min_keypoints))
+                gt_keypoints_visible.sum(axis=-1) >= self.min_keypoints)
 
         keep = tests[0]
         for t in tests[1:]:

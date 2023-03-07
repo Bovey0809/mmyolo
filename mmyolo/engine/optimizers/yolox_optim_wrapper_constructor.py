@@ -7,7 +7,6 @@ from mmengine.logging import print_log
 from mmengine.model import is_model_wrapper
 from mmengine.optim import OptimWrapper
 
-from mmyolo.models.dense_heads.yolov7_head import ImplicitA, ImplicitM
 from mmyolo.registry import (OPTIM_WRAPPER_CONSTRUCTORS, OPTIM_WRAPPERS,
                              OPTIMIZERS)
 

@@ -42,8 +42,7 @@ class YOLOXBBoxCoder(BaseBBoxCoder):
         br_x = (xys[..., 0] + whs[..., 0] / 2)
         br_y = (xys[..., 1] + whs[..., 1] / 2)
 
-        decoded_bboxes = torch.stack([tl_x, tl_y, br_x, br_y], -1)
-        return decoded_bboxes
+        return torch.stack([tl_x, tl_y, br_x, br_y], -1)
 
 
 @TASK_UTILS.register_module()
@@ -60,8 +59,7 @@ class YOLOXKptCoder(BaseBBoxCoder):
 
     def decode(self, priors: torch.Tensor, pred_kpts: torch.Tensor,
                stride: Union[torch.Tensor, int]) -> torch.Tensor:
-        """Decode regression results (delta_x, delta_y) to kpts (tl_x,
-        tl_y).
+        """Decode regression results (delta_x, delta_y) to kpts (tl_x, tl_y).
 
         Args:
             priors (torch.Tensor): Basic boxes or points, e.g. anchor.
@@ -81,9 +79,11 @@ class YOLOXKptCoder(BaseBBoxCoder):
             c = 3
         else:
             raise NotImplementedError(
-                "Keypoints decoder is for xyv, or xy only.")
+                'Keypoints decoder is for xyv, or xy only.')
         stride = stride[None, :, None, None]
         pred_kpts = rearrange(pred_kpts, 'b h (k c) -> b h k c', c=c)
-        priors = repeat(priors, 'anchors xy -> anchors keypoints xy', keypoints=pred_kpts.shape[-2])
-        xy_coordinates = (pred_kpts[..., :2] * stride) + priors
-        return xy_coordinates
+        priors = repeat(
+            priors,
+            'anchors xy -> anchors keypoints xy',
+            keypoints=pred_kpts.shape[-2])
+        return (pred_kpts[..., :2] * stride) + priors
