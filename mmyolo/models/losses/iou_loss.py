@@ -211,8 +211,7 @@ class IoULoss(nn.Module):
                 weight = weight.unsqueeze(1)
             return (pred * weight).sum()  # 0
         assert reduction_override in (None, 'none', 'mean', 'sum')
-        reduction = (
-            reduction_override if reduction_override else self.reduction)
+        reduction = reduction_override or self.reduction
 
         if weight is not None and weight.dim() > 1:
             weight = weight.mean(-1)
@@ -226,7 +225,4 @@ class IoULoss(nn.Module):
         loss = self.loss_weight * weight_reduce_loss(1.0 - iou, weight,
                                                      reduction, avg_factor)
 
-        if self.return_iou:
-            return loss, iou
-        else:
-            return loss
+        return (loss, iou) if self.return_iou else loss

@@ -5,12 +5,13 @@ from .rtmdet_ins_head import RTMDetInsSepBNHead, RTMDetInsSepBNHeadModule
 from .rtmdet_rotated_head import (RTMDetRotatedHead,
                                   RTMDetRotatedSepBNHeadModule)
 from .yolov5_head import YOLOv5Head, YOLOv5HeadModule
+from .yolov5_pose_head import YOLOv5PoseHead, YOLOv5PoseHeadModule
 from .yolov6_head import YOLOv6Head, YOLOv6HeadModule
 from .yolov7_head import YOLOv7Head, YOLOv7HeadModule, YOLOv7p6HeadModule
 from .yolov8_head import YOLOv8Head, YOLOv8HeadModule
 from .yolox_head import YOLOXHead, YOLOXHeadModule
 from .yolox_kpt_head import YOLOXKptHead, YOLOXKptHeadModule
-from .yolox_kpt_head_only import YOLOXKptOnlyHead ,YOLOXKptOnlyHeadModule
+from .yolox_kpt_head_only import YOLOXKptOnlyHead, YOLOXKptOnlyHeadModule
 
 __all__ = [
     'YOLOv5Head', 'YOLOv6Head', 'YOLOXHead', 'YOLOv5HeadModule',
@@ -18,6 +19,7 @@ __all__ = [
     'RTMDetSepBNHeadModule', 'YOLOv7Head', 'PPYOLOEHead', 'PPYOLOEHeadModule',
     'YOLOv7HeadModule', 'YOLOv7p6HeadModule', 'YOLOv8Head', 'YOLOv8HeadModule',
     'RTMDetRotatedHead', 'RTMDetRotatedSepBNHeadModule', 'RTMDetInsSepBNHead',
-    'RTMDetInsSepBNHeadModule',
-    'YOLOXKptHead', 'YOLOXKptHeadModule', 'YOLOXKptOnlyHead', 'YOLOXKptOnlyHeadModule'
+    'RTMDetInsSepBNHeadModule', 'YOLOXKptHead', 'YOLOXKptHeadModule',
+    'YOLOXKptOnlyHead', 'YOLOXKptOnlyHeadModule', 'YOLOv5PoseHead',
+    'YOLOv5PoseHeadModule'
 ]

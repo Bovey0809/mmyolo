@@ -195,7 +195,7 @@ num_classes = 1  # Number of classes for classification
 # Batch size of a single GPU during training
 train_batch_size_per_gpu = 16
 # Worker to pre-fetch data for each single GPU during training
-train_num_workers = 8
+train_num_workers = 4
 # persistent_workers must be False if num_workers is 0
 persistent_workers = True
 
@@ -294,10 +294,11 @@ model = dict(
         norm_cfg=norm_cfg,
         act_cfg=dict(type='SiLU', inplace=True)),
     bbox_head=dict(
-        type='YOLOv5Head',
+        type='YOLOv5PoseHead',
         head_module=dict(
-            type='YOLOv5HeadModule',
+            type='YOLOv5PoseHeadModule',
             num_classes=num_classes,
+            num_keypoints=17,
             in_channels=[256, 512, 1024],
             widen_factor=widen_factor,
             featmap_strides=strides,
@@ -327,6 +328,7 @@ model = dict(
             reduction='mean',
             loss_weight=loss_obj_weight *
             ((img_scale[0] / 640)**2 * 3 / num_det_layers)),
+        loss_kpt=dict(type='OksLoss', dataset_info=dataset_info),
         prior_match_thr=prior_match_thr,
         obj_level_weights=obj_level_weights),
     test_cfg=model_test_cfg)

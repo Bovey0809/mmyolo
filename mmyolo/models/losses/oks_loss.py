@@ -14,7 +14,10 @@ from mmyolo.registry import MODELS
 @MODELS.register_module()
 class OksLoss(nn.Module):
 
-    def __init__(self, dataset_info, loss_type='oks', loss_weight=1.0) -> None:
+    def __init__(self,
+                 dataset_info,
+                 loss_type='oks_yolox',
+                 loss_weight=1.0) -> None:
         super().__init__()
         self.l1_loss = SmoothL1Loss()
         self.l2_loss = nn.MSELoss(reduction='none')
@@ -27,10 +30,15 @@ class OksLoss(nn.Module):
             raise TypeError('dataset_info must be a dict or a str')
         self.oks_type = loss_type
         self.loss_weight = loss_weight
+        self.num_keypoints = len(dataset_info['keypoint_info'])
 
     def forward(self, kpt_preds: Tensor, kpt_targets: Tensor, kpt_mask: Tensor,
                 bbox_targets: Tensor) -> Tensor:
         if self.oks_type == 'oks_yolox':
+            if kpt_preds.dim() == 2:
+                kpt_preds = kpt_preds.view(-1, self.num_keypoints, 2)
+            if kpt_targets.dim() == 2:
+                kpt_targets = kpt_targets.view(-1, self.num_keypoints, 2)
             loss = self.yolox_pose_loss(kpt_preds, kpt_targets, kpt_mask,
                                         bbox_targets)
         elif self.oks_type == 'l1':
