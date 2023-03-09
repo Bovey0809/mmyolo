@@ -16,6 +16,7 @@ from mmengine.logging import print_log
 from mmengine.model import BaseModule
 from mmengine.structures import InstanceData
 from torch import Tensor
+
 from mmyolo.registry import MODELS, TASK_UTILS
 from ..utils import make_divisible
 
@@ -31,9 +32,8 @@ def get_prior_xy_info(index: int, num_base_priors: int,
 
 
 def autopad(k, p=None):
-    """
-    https://github.com/TexasInstruments/edgeai-yolov5/blob/models/common.py
-    """
+    """https://github.com/TexasInstruments/edgeai-
+    yolov5/blob/models/common.py."""
     # kernel, padding
     # Pad to 'same'
     if p is None:
@@ -45,12 +45,13 @@ class Conv(nn.Module):
     # Standard convolution
     def __init__(self, c1, c2, k=1, s=1, p=None, g=1, act=True):
         # ch_in, ch_out, kernel, stride, padding, groups
-        super(Conv, self).__init__()
-        self.conv = nn.Conv2d(c1, c2, k, s, autopad(k, p),
-                              groups=g, bias=False)
+        super().__init__()
+        self.conv = nn.Conv2d(
+            c1, c2, k, s, autopad(k, p), groups=g, bias=False)
         self.bn = nn.BatchNorm2d(c2)
-        if act != "ReLU":
-            self.act = nn.SiLU() if act is True else (act if isinstance(act, nn.Module) else nn.Identity())
+        if act != 'ReLU':
+            self.act = nn.SiLU() if act is True else (
+                act if isinstance(act, nn.Module) else nn.Identity())
         else:
             self.act = nn.ReLU(inplace=True)
 
@@ -131,12 +132,10 @@ class YOLOv5PoseHeadModule(BaseModule):
         for i in range(self.num_levels):
             x = self.in_channels[i]
             conv_kpt = nn.Sequential(
-                DWConv(x, x, k=3), Conv(x, x),
-                DWConv(x, x, k=3), Conv(x, x),
-                DWConv(x, x, k=3), Conv(x, x),
-                DWConv(x, x, k=3), Conv(x, x),
-                DWConv(x, x, k=3), Conv(x, x),
-                DWConv(x, x, k=3), nn.Conv2d(x, self.num_base_priors * self.num_keypoints * 3, 1))
+                DWConv(x, x, k=3), Conv(x, x), DWConv(x, x, k=3), Conv(x, x),
+                DWConv(x, x, k=3), Conv(x, x), DWConv(x, x, k=3), Conv(x, x),
+                DWConv(x, x, k=3), Conv(x, x), DWConv(x, x, k=3),
+                nn.Conv2d(x, self.num_base_priors * self.num_keypoints * 3, 1))
             self.convs_kpt.append(conv_kpt)
 
     def init_weights(self):
@@ -158,7 +157,7 @@ class YOLOv5PoseHeadModule(BaseModule):
                     elif isinstance(mii, nn.BatchNorm2d):
                         mii.eps = 1e-3
                         mii.momentum = 0.03
-                    elif isinstance(mii, (nn.LeakyReLU, nn.ReLU, nn.ReLU6, nn.Hardswish)):
+                    elif isinstance(mii, nn.ReLU):
                         mii.inplace = True
 
     def forward(self, x: Tuple[Tensor]) -> Tuple[List]:
@@ -172,13 +171,12 @@ class YOLOv5PoseHeadModule(BaseModule):
             predictions, and objectnesses.
         """
         assert len(x) == self.num_levels
-        return multi_apply(self.forward_single,
-                           x, self.convs_pred, self.convs_kpt)
+        return multi_apply(self.forward_single, x, self.convs_pred,
+                           self.convs_kpt)
 
-    def forward_single(self, x: Tensor,
-                       convs: nn.Module,
-                       convs_kpt: nn.Module) -> Tuple[
-                        Tensor, Tensor, Tensor, Tensor, Tensor]:
+    def forward_single(
+            self, x: Tensor, convs: nn.Module, convs_kpt: nn.Module
+    ) -> Tuple[Tensor, Tensor, Tensor, Tensor, Tensor]:
         """Forward feature of a single scale level."""
 
         pred_map = convs(x)
@@ -191,8 +189,8 @@ class YOLOv5PoseHeadModule(BaseModule):
 
         kpt_pred_map = convs_kpt(x)
         bs, _, ny, nx = kpt_pred_map.shape
-        kpt_pred_map = kpt_pred_map.view(
-            bs, self.num_base_priors, self.num_keypoints * 3, ny, nx)
+        kpt_pred_map = kpt_pred_map.view(bs, self.num_base_priors,
+                                         self.num_keypoints * 3, ny, nx)
         kpt_pred_x = kpt_pred_map[:, :, 0::3, ...].reshape(bs, -1, ny, nx)
         kpt_pred_y = kpt_pred_map[:, :, 1::3, ...].reshape(bs, -1, ny, nx)
         kpt_vis = kpt_pred_map[:, :, 2::3, ...].reshape(bs, -1, ny, nx)
