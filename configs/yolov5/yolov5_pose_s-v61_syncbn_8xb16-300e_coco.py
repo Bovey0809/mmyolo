@@ -183,7 +183,7 @@ dataset_info = dict(
 
 # ========================Frequently modified parameters======================
 # -----data related-----
-data_root = 'data/subcoco/'  # Root path of data
+data_root = 'data/coco/'  # Root path of data
 # Path of train annotation file
 train_ann_file = 'annotations/person_keypoints_train2017.json'
 train_data_prefix = 'train2017/'  # Prefix of train image path

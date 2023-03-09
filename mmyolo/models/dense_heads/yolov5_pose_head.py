@@ -16,7 +16,6 @@ from mmengine.logging import print_log
 from mmengine.model import BaseModule
 from mmengine.structures import InstanceData
 from torch import Tensor
-
 from mmyolo.registry import MODELS, TASK_UTILS
 from ..utils import make_divisible
 
@@ -29,6 +28,42 @@ def get_prior_xy_info(index: int, num_base_priors: int,
     grid_y = xy_index // featmap_w
     grid_x = xy_index % featmap_w
     return priors, grid_x, grid_y
+
+
+def autopad(k, p=None):
+    """
+    https://github.com/TexasInstruments/edgeai-yolov5/blob/models/common.py
+    """
+    # kernel, padding
+    # Pad to 'same'
+    if p is None:
+        p = k // 2 if isinstance(k, int) else [x // 2 for x in k]  # auto-pad
+    return p
+
+
+class Conv(nn.Module):
+    # Standard convolution
+    def __init__(self, c1, c2, k=1, s=1, p=None, g=1, act=True):
+        # ch_in, ch_out, kernel, stride, padding, groups
+        super(Conv, self).__init__()
+        self.conv = nn.Conv2d(c1, c2, k, s, autopad(k, p),
+                              groups=g, bias=False)
+        self.bn = nn.BatchNorm2d(c2)
+        if act != "ReLU":
+            self.act = nn.SiLU() if act is True else (act if isinstance(act, nn.Module) else nn.Identity())
+        else:
+            self.act = nn.ReLU(inplace=True)
+
+    def forward(self, x):
+        return self.act(self.bn(self.conv(x)))
+
+    def fuseforward(self, x):
+        return self.act(self.conv(x))
+
+
+def DWConv(c1, c2, k=1, s=1, act=True):
+    # Depthwise convolution
+    return Conv(c1, c2, k, s, g=math.gcd(c1, c2), act=act)
 
 
 @MODELS.register_module()
@@ -58,16 +93,19 @@ class YOLOv5PoseHeadModule(BaseModule):
                  widen_factor: float = 1.0,
                  num_base_priors: int = 3,
                  featmap_strides: Sequence[int] = (8, 16, 32),
-                 init_cfg: OptMultiConfig = None):
+                 init_cfg: OptMultiConfig = None,
+                 kpt_conv_stacks: int = 5):
         super().__init__(init_cfg=init_cfg)
         self.num_classes = num_classes
         self.num_keypoints = num_keypoints
         self.widen_factor = widen_factor
 
         self.featmap_strides = featmap_strides
-        self.num_out_attrib = 5 + self.num_classes + self.num_keypoints * 3
+        self.num_out_attrib = 5 + self.num_classes
         self.num_levels = len(self.featmap_strides)
         self.num_base_priors = num_base_priors
+
+        self.kpt_conv_stacks = kpt_conv_stacks
 
         if isinstance(in_channels, int):
             self.in_channels = [make_divisible(in_channels, widen_factor)
@@ -86,8 +124,20 @@ class YOLOv5PoseHeadModule(BaseModule):
             conv_pred = nn.Conv2d(self.in_channels[i],
                                   self.num_base_priors * self.num_out_attrib,
                                   1)
-
             self.convs_pred.append(conv_pred)
+
+        # keypoints head
+        self.convs_kpt = nn.ModuleList()
+        for i in range(self.num_levels):
+            x = self.in_channels[i]
+            conv_kpt = nn.Sequential(
+                DWConv(x, x, k=3), Conv(x, x),
+                DWConv(x, x, k=3), Conv(x, x),
+                DWConv(x, x, k=3), Conv(x, x),
+                DWConv(x, x, k=3), Conv(x, x),
+                DWConv(x, x, k=3), Conv(x, x),
+                DWConv(x, x, k=3), nn.Conv2d(x, self.num_base_priors * self.num_keypoints * 3, 1))
+            self.convs_kpt.append(conv_kpt)
 
     def init_weights(self):
         """Initialize the bias of YOLOv5 head."""
@@ -100,6 +150,17 @@ class YOLOv5PoseHeadModule(BaseModule):
 
             mi.bias.data = b.view(-1)
 
+        for m in self.convs_kpt:
+            for mi in m:
+                for mii in mi.modules():
+                    if isinstance(mii, nn.Conv2d):
+                        pass
+                    elif isinstance(mii, nn.BatchNorm2d):
+                        mii.eps = 1e-3
+                        mii.momentum = 0.03
+                    elif isinstance(mii, (nn.LeakyReLU, nn.ReLU, nn.ReLU6, nn.Hardswish)):
+                        mii.inplace = True
+
     def forward(self, x: Tuple[Tensor]) -> Tuple[List]:
         """Forward features from the upstream network.
 
@@ -111,10 +172,13 @@ class YOLOv5PoseHeadModule(BaseModule):
             predictions, and objectnesses.
         """
         assert len(x) == self.num_levels
-        return multi_apply(self.forward_single, x, self.convs_pred)
+        return multi_apply(self.forward_single,
+                           x, self.convs_pred, self.convs_kpt)
 
     def forward_single(self, x: Tensor,
-                       convs: nn.Module) -> Tuple[Tensor, Tensor, Tensor]:
+                       convs: nn.Module,
+                       convs_kpt: nn.Module) -> Tuple[
+                        Tensor, Tensor, Tensor, Tensor, Tensor]:
         """Forward feature of a single scale level."""
 
         pred_map = convs(x)
@@ -123,11 +187,18 @@ class YOLOv5PoseHeadModule(BaseModule):
                                  ny, nx)
         bbox_pred = pred_map[:, :, :4, ...].reshape(bs, -1, ny, nx)
         objectness = pred_map[:, :, 4:5, ...].reshape(bs, -1, ny, nx)
-        cls_score = pred_map[:, :, 5:6, ...].reshape(bs, -1, ny, nx)
-        kpt_pred = pred_map[:, :, 6:6 + self.num_keypoints * 2,
-                            ...].reshape(bs, -1, ny, nx)
-        kpt_vis = pred_map[:, :, 6 + self.num_keypoints * 2:,
-                           ...].reshape(bs, -1, ny, nx)
+        cls_score = pred_map[:, :, 5:, ...].reshape(bs, -1, ny, nx)
+
+        kpt_pred_map = convs_kpt(x)
+        bs, _, ny, nx = kpt_pred_map.shape
+        kpt_pred_map = kpt_pred_map.view(
+            bs, self.num_base_priors, self.num_keypoints * 3, ny, nx)
+        kpt_pred_x = kpt_pred_map[:, :, 0::3, ...].reshape(bs, -1, ny, nx)
+        kpt_pred_y = kpt_pred_map[:, :, 1::3, ...].reshape(bs, -1, ny, nx)
+        kpt_vis = kpt_pred_map[:, :, 2::3, ...].reshape(bs, -1, ny, nx)
+
+        kpt_pred = torch.cat([kpt_pred_x, kpt_pred_y], dim=1)
+
         return cls_score, bbox_pred, objectness, kpt_pred, kpt_vis
 
 
