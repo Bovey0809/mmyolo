@@ -183,7 +183,7 @@ dataset_info = dict(
 
 # ========================Frequently modified parameters======================
 # -----data related-----
-data_root = 'data/coco/'  # Root path of data
+data_root = 'data/subcoco/'  # Root path of data
 # Path of train annotation file
 train_ann_file = 'annotations/person_keypoints_train2017.json'
 train_data_prefix = 'train2017/'  # Prefix of train image path
@@ -257,6 +257,7 @@ affine_scale = 0.5  # YOLOv5RandomAffine scaling ratio
 loss_cls_weight = 0.5
 loss_bbox_weight = 0.05
 loss_obj_weight = 1.0
+loss_kpt_weight = 0.10
 prior_match_thr = 4.  # Priori box matching threshold
 # The obj loss weights of the three output layers
 obj_level_weights = [4., 1., 0.4]
@@ -307,6 +308,8 @@ model = dict(
             type='mmdet.YOLOAnchorGenerator',
             base_sizes=anchors,
             strides=strides),
+        bbox_coder=dict(type='YOLOv5BBoxCoder'),
+        kpt_coder=dict(type='YOLOv5PoseKptCoder'),
         # scaled based on number of detection layers
         loss_cls=dict(
             type='mmdet.CrossEntropyLoss',
@@ -328,7 +331,10 @@ model = dict(
             reduction='mean',
             loss_weight=loss_obj_weight *
             ((img_scale[0] / 640)**2 * 3 / num_det_layers)),
-        loss_kpt=dict(type='OksLoss', dataset_info=dataset_info),
+        loss_kpt=dict(
+            type='OksLoss',
+            dataset_info=dataset_info,
+            loss_weight=loss_kpt_weight * (3 / num_det_layers)),
         prior_match_thr=prior_match_thr,
         obj_level_weights=obj_level_weights),
     test_cfg=model_test_cfg)
@@ -462,11 +468,18 @@ custom_hooks = [
         priority=49)
 ]
 
-val_evaluator = dict(
-    type='mmdet.CocoMetric',
-    proposal_nums=(100, 1, 10),
-    ann_file=data_root + val_ann_file,
-    metric='bbox')
+val_evaluator = [
+    dict(
+        type='mmdet.CocoMetric',
+        proposal_nums=(100, 1, 10),
+        ann_file=data_root + val_ann_file,
+        metric='bbox'),
+    dict(
+        type='CocoMetric',
+        ann_file=data_root + val_ann_file,
+        score_mode='bbox',
+        nms_mode='none')
+]
 test_evaluator = val_evaluator
 
 train_cfg = dict(

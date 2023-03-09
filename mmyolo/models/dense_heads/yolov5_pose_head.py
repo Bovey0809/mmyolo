@@ -16,6 +16,7 @@ from mmengine.logging import print_log
 from mmengine.model import BaseModule
 from mmengine.structures import InstanceData
 from torch import Tensor
+from torchvision.ops import batched_nms
 
 from mmyolo.registry import MODELS, TASK_UTILS
 from ..utils import make_divisible
@@ -233,7 +234,7 @@ class YOLOv5PoseHead(BaseDenseHead):
                                  [(116, 90), (156, 198), (373, 326)]],
                      strides=[8, 16, 32]),
                  bbox_coder: ConfigType = dict(type='YOLOv5BBoxCoder'),
-                 kpt_coder=dict(type='YOLOXKptCoder'),
+                 kpt_coder=dict(type='YOLOv5PoseKptCoder'),
                  loss_cls: ConfigType = dict(
                      type='mmdet.CrossEntropyLoss',
                      use_sigmoid=True,
@@ -437,11 +438,26 @@ class YOLOv5PoseHead(BaseDenseHead):
             bbox_pred.permute(0, 2, 3, 1).reshape(num_imgs, -1, 4)
             for bbox_pred in bbox_preds
         ]
+        flatten_kpt_preds = [
+            kpt_pred.permute(0, 2, 3, 1).reshape(num_imgs, -1,
+                                                 self.num_keypoints * 2)
+            for kpt_pred in kpts_preds
+        ]
+        flatten_vis_preds = [
+            vis_pred.permute(0, 2, 3, 1).reshape(num_imgs, -1,
+                                                 self.num_keypoints)
+            for vis_pred in vis_preds
+        ]
 
         flatten_cls_scores = torch.cat(flatten_cls_scores, dim=1).sigmoid()
         flatten_bbox_preds = torch.cat(flatten_bbox_preds, dim=1)
         flatten_decoded_bboxes = self.bbox_coder.decode(
             flatten_priors[None], flatten_bbox_preds, flatten_stride)
+        flatten_kpt_preds = torch.cat(flatten_kpt_preds, dim=1)
+        flatten_decoded_kpts = self.kpt_coder.decode(flatten_priors[None],
+                                                     flatten_kpt_preds,
+                                                     flatten_stride)
+        flatten_vis_preds = torch.cat(flatten_vis_preds, dim=1).sigmoid()
 
         if with_objectnesses:
             flatten_objectness = [
@@ -453,8 +469,9 @@ class YOLOv5PoseHead(BaseDenseHead):
             flatten_objectness = [None for _ in range(num_imgs)]
 
         results_list = []
-        for (bboxes, scores, objectness,
+        for (bboxes, scores, keypoints, kpt_vis, objectness,
              img_meta) in zip(flatten_decoded_bboxes, flatten_cls_scores,
+                              flatten_decoded_kpts, flatten_vis_preds,
                               flatten_objectness, batch_img_metas):
             ori_shape = img_meta['ori_shape']
             scale_factor = img_meta['scale_factor']
@@ -478,6 +495,8 @@ class YOLOv5PoseHead(BaseDenseHead):
                 empty_results.bboxes = bboxes
                 empty_results.scores = scores[:, 0]
                 empty_results.labels = scores[:, 0].int()
+                empty_results.keypoints = keypoints
+                empty_results.keypoints_scores = kpt_vis
                 results_list.append(empty_results)
                 continue
 
@@ -495,29 +514,49 @@ class YOLOv5PoseHead(BaseDenseHead):
                     scores, score_thr, nms_pre)
 
             results = InstanceData(
-                scores=scores, labels=labels, bboxes=bboxes[keep_idxs])
+                scores=scores,
+                labels=labels,
+                bboxes=bboxes[keep_idxs],
+                keypoints=keypoints[keep_idxs],
+                keypoint_scores=kpt_vis[keep_idxs])
 
             if rescale:
                 if pad_param is not None:
                     results.bboxes -= results.bboxes.new_tensor([
                         pad_param[2], pad_param[0], pad_param[2], pad_param[0]
                     ])
+                    results.keypoints -= results.keypoints.new_tensor(
+                        [pad_param[2], pad_param[0]])
                 results.bboxes /= results.bboxes.new_tensor(
                     scale_factor).repeat((1, 2))
+                results.keypoints /= results.keypoints.new_tensor(
+                    scale_factor).repeat((1, self.num_keypoints, 1))
 
             if cfg.get('yolox_style', False):
                 # do not need max_per_img
                 cfg.max_per_img = len(results)
 
-            results = self._bbox_post_process(
-                results=results,
-                cfg=cfg,
-                rescale=False,
-                with_nms=with_nms,
-                img_meta=img_meta)
+            # results = self._bbox_post_process(
+            #     results=results,
+            #     cfg=cfg,
+            #     rescale=False,
+            #     with_nms=with_nms,
+            #     img_meta=img_meta)
+            # results.bboxes[:, 0::2].clamp_(0, ori_shape[1])
+            # results.bboxes[:, 1::2].clamp_(0, ori_shape[0])
+
+            # results_list.append(results)
+            if with_nms:
+                keep = batched_nms(results.bboxes, results.scores, labels,
+                                   score_thr)
+                results = InstanceData(
+                    bboxes=results.bboxes[keep],
+                    scores=results.scores[keep],
+                    labels=results.labels[keep],
+                    keypoints=results.keypoints[keep],
+                    keypoint_scores=results.keypoint_scores[keep])
             results.bboxes[:, 0::2].clamp_(0, ori_shape[1])
             results.bboxes[:, 1::2].clamp_(0, ori_shape[0])
-
             results_list.append(results)
         return results_list
 
@@ -706,6 +745,17 @@ class YOLOv5PoseHead(BaseDenseHead):
             kpt_targets = t[..., 6:-(self.num_keypoints + 1)]
 
             # 4. Calculate loss
+
+            # bbox loss
+            retained_bbox_pred = bbox_preds[i].reshape(
+                batch_size, self.num_base_priors, -1, h,
+                w)[img_inds, priors_inds, :, grid_y_inds, grid_x_inds]
+            priors_base_sizes_i = priors_base_sizes_i[priors_inds]
+            decoded_bbox_pred = self._decode_bbox_to_xywh(
+                retained_bbox_pred, priors_base_sizes_i)
+            loss_box_i, iou = self.loss_bbox(decoded_bbox_pred, bboxes_targets)
+            loss_box += loss_box_i
+
             # kpt loss
             retained_kpt_pred = kpt_preds[i].reshape(batch_size,
                                                      self.num_base_priors, -1,
@@ -729,19 +779,10 @@ class YOLOv5PoseHead(BaseDenseHead):
                                                            priors_inds, :,
                                                            grid_y_inds,
                                                            grid_x_inds]
-            loss_vis_i = self.loss_obj(retained_vis_pred,
-                                       vis_targets) * self.obj_level_weights[i]
+            loss_vis_i = self.loss_obj(
+                retained_vis_pred,
+                kpt_mask.float()) * self.obj_level_weights[i]
             loss_vis += loss_vis_i
-
-            # bbox loss
-            retained_bbox_pred = bbox_preds[i].reshape(
-                batch_size, self.num_base_priors, -1, h,
-                w)[img_inds, priors_inds, :, grid_y_inds, grid_x_inds]
-            priors_base_sizes_i = priors_base_sizes_i[priors_inds]
-            decoded_bbox_pred = self._decode_bbox_to_xywh(
-                retained_bbox_pred, priors_base_sizes_i)
-            loss_box_i, iou = self.loss_bbox(decoded_bbox_pred, bboxes_targets)
-            loss_box += loss_box_i
 
             # obj loss
             iou = iou.detach().clamp(0)
@@ -838,7 +879,7 @@ class YOLOv5PoseHead(BaseDenseHead):
         return batch_gt_instances.repeat(self.num_base_priors, 1, 1)
 
     def _decode_kpt(self, kpt_pred) -> Tensor:
-        kpt_pred = kpt_pred.sigmoid()
+        # kpt_pred = kpt_pred.sigmoid()
         return kpt_pred * 2 - 0.5
 
     def _decode_bbox_to_xywh(self, bbox_pred, priors_base_sizes) -> Tensor:

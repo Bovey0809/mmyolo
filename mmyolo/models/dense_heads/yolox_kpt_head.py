@@ -15,6 +15,7 @@ from mmengine.config import ConfigDict
 from mmengine.model import BaseModule, bias_init_with_prob
 from mmengine.structures import InstanceData
 from torch import Tensor
+from torchvision.ops import batched_nms
 
 from mmyolo.datasets.utils import Keypoints
 from mmyolo.registry import MODELS, TASK_UTILS
@@ -500,27 +501,17 @@ class YOLOXKptHead(YOLOv5Head):
                 # do not need max_per_img
                 cfg.max_per_img = len(results)
 
-            results = self._bbox_post_process(
-                results=results,
-                cfg=cfg,
-                rescale=False,
-                with_nms=with_nms,
-                img_meta=img_meta)
+            if with_nms:
+                keep = batched_nms(results.bboxes, results.scores, labels,
+                                   score_thr)
+                results = InstanceData(
+                    bboxes=results.bboxes[keep],
+                    scores=results.scores[keep],
+                    labels=results.labels[keep],
+                    keypoints=results.keypoints[keep],
+                    keypoint_scores=results.keypoint_scores[keep])
             results.bboxes[:, 0::2].clamp_(0, ori_shape[1])
             results.bboxes[:, 1::2].clamp_(0, ori_shape[0])
-
-            # results = self._kpt_post_process(
-            #     results,
-            #     cfg,
-            #     rescale=False,
-            #     with_nms=with_nms,
-            #     img_meta=img_meta)
-            # keypoints outside the image, the visibility is set to 0
-            # results.keypoints[:, :, 0].clamp_(0, ori_shape[1])
-            # results.keypoints[:, :, 1].clamp_(0, ori_shape[0])
-            # results.keypoint_scores[results.keypoints[:, :, 0] == 0] = 0
-            # results.keypoint_scores[results.keypoints[:, :, 1] == 0] = 0
-
             results_list.append(results)
         return results_list
 
