@@ -622,8 +622,9 @@ class YOLOv5PoseHead(BaseDenseHead):
         loss_obj = torch.zeros(1, device=device)
         loss_kpt = torch.zeros(1, device=device)
         loss_vis = torch.zeros(1, device=device)
-        scaled_factor = torch.ones(
-            self.head_module.num_out_attrib + 1, device=device)
+        gain = torch.ones(
+            self.head_module.num_out_attrib + 1 + self.num_keypoints * 3,
+            device=device)
 
         for i in range(self.num_levels):
             batch_size, _, h, w = bbox_preds[i].shape
@@ -641,22 +642,21 @@ class YOLOv5PoseHead(BaseDenseHead):
 
             priors_base_sizes_i = self.priors_base_sizes[i]
             # feature map scale whwh
-            scaled_factor[2:-(self.num_keypoints + 1)] = torch.tensor(
+            gain[2:40] = torch.tensor(
                 bbox_preds[i].shape)[[3, 2] * (self.num_keypoints + 2)]
 
             # Scale batch_targets from range 0-1 to range 0-features_maps size.
             # (num_base_priors, num_bboxes, 58)
-            batch_targets_scaled = batch_targets_normed * scaled_factor
+            t = batch_targets_normed * gain
 
             # 2. Shape match
-            wh_ratio = batch_targets_scaled[...,
-                                            4:6] / priors_base_sizes_i[:, None]
+            wh_ratio = t[..., 4:6] / priors_base_sizes_i[:, None]
             match_inds = torch.max(
                 wh_ratio, 1 / wh_ratio).max(2)[0] < self.prior_match_thr
-            batch_targets_scaled = batch_targets_scaled[match_inds]
+            t = t[match_inds]
 
             # no gt bbox matches anchor
-            if batch_targets_scaled.shape[0] == 0:
+            if t.shape[0] == 0:
                 loss_box += bbox_preds[i].sum() * 0
                 loss_cls += cls_scores[i].sum() * 0
                 loss_kpt += kpt_preds[i].sum() * 0
@@ -670,47 +670,40 @@ class YOLOv5PoseHead(BaseDenseHead):
             # check the left, up, right, bottom sides of the
             # targets grid, and determine whether assigned
             # them as positive samples as well.
-            batch_targets_cxcy = batch_targets_scaled[:, 2:4]
-            grid_xy = scaled_factor[[2, 3]] - batch_targets_cxcy
-            left, up = ((batch_targets_cxcy % 1 < self.near_neighbor_thr) &
-                        (batch_targets_cxcy > 1)).T
-            right, bottom = ((grid_xy % 1 < self.near_neighbor_thr) &
-                             (grid_xy > 1)).T
+            gxy = t[:, 2:4]
+            grid_xi = gain[[2, 3]] - gxy
+            left, up = ((gxy % 1 < self.near_neighbor_thr) & (gxy > 1)).T
+            right, bottom = ((grid_xi % 1 < self.near_neighbor_thr) &
+                             (grid_xi > 1)).T
             offset_inds = torch.stack(
                 (torch.ones_like(left), left, up, right, bottom))
 
-            batch_targets_scaled = batch_targets_scaled.repeat(
-                (5, 1, 1))[offset_inds]
+            t = t.repeat((5, 1, 1))[offset_inds]
             retained_offsets = self.grid_offset.repeat(1, offset_inds.shape[1],
                                                        1)[offset_inds]
 
             # prepare pred results and positive sample indexes to
             # calculate class loss and bbox loss.
-            img_class_inds = batch_targets_scaled[..., :2]
-            grid_xy = batch_targets_scaled[..., 2:4]
-            grid_wh = batch_targets_scaled[..., 4:6]
-            priors_inds = batch_targets_scaled[..., -1:]
+            img_class_inds = t[..., :2]
+            grid_xi = t[..., 2:4]
+            grid_wh = t[..., 4:6]
+            priors_inds = t[..., -1:]
 
             priors_inds, (img_inds, class_inds) = priors_inds.long().view(
                 -1), img_class_inds.long().T
 
-            grid_xy_long = (grid_xy -
-                            retained_offsets * self.near_neighbor_thr).long()
-            grid_x_inds, grid_y_inds = grid_xy_long.T
-            bboxes_targets = torch.cat((grid_xy - grid_xy_long, grid_wh), 1)
-
-            # keypoints targets
-            kpt_targets_xy = batch_targets_scaled[...,
-                                                  6:6 + self.num_keypoints * 2]
-            kpt_targets_xy = kpt_targets_xy.view(-1, self.num_keypoints, 2)
-            kpt_targets_xy = kpt_targets_xy - grid_xy[:, None]
-            kpt_targets_xy = kpt_targets_xy / grid_wh[:, None]
-            kpt_targets_xy = kpt_targets_xy.view(-1, self.num_keypoints * 2)
+            grid_ij = (grid_xi -
+                       retained_offsets * self.near_neighbor_thr).long()
+            grid_x_inds, grid_y_inds = grid_ij.T
+            bboxes_targets = torch.cat((grid_xi - grid_ij, grid_wh), 1)
 
             # visibility targets
-            vis_targets = batch_targets_scaled[...,
-                                               6 + self.num_keypoints * 2:-1]
-            vis_targets = vis_targets.view(-1, self.num_keypoints)
+            vis_targets = t[..., -(self.num_keypoints + 1):-1]
+
+            # keypoints targets
+            for kpt_id in range(self.num_keypoints):
+                t[..., 6 + kpt_id * 2:8 + kpt_id * 2] -= grid_ij
+            kpt_targets = t[..., 6:-(self.num_keypoints + 1)]
 
             # 4. Calculate loss
             # kpt loss
@@ -725,8 +718,8 @@ class YOLOv5PoseHead(BaseDenseHead):
             bboxes_targets_xyxy = bboxes_targets.clone()
             bboxes_targets_xyxy[:, 2:] = bboxes_targets_xyxy[:, :2] + \
                 bboxes_targets_xyxy[:, 2:]
-            loss_kpt_i = self.loss_kpt(decoded_kpt_pred, kpt_targets_xy,
-                                       kpt_mask, bboxes_targets_xyxy)
+            loss_kpt_i = self.loss_kpt(decoded_kpt_pred, kpt_targets, kpt_mask,
+                                       bboxes_targets_xyxy)
             loss_kpt += loss_kpt_i
 
             # vis loss
@@ -764,8 +757,7 @@ class YOLOv5PoseHead(BaseDenseHead):
                     w)[img_inds, priors_inds, :, grid_y_inds, grid_x_inds]
 
                 target_class = torch.full_like(pred_cls_scores, 0.)
-                target_class[range(batch_targets_scaled.shape[0]),
-                             class_inds] = 1.
+                target_class[range(t.shape[0]), class_inds] = 1.
                 loss_cls += self.loss_cls(pred_cls_scores, target_class)
             else:
                 loss_cls += cls_scores[i].sum() * 0
@@ -782,6 +774,7 @@ class YOLOv5PoseHead(BaseDenseHead):
     def _convert_gt_to_norm_format(self,
                                    batch_gt_instances: Sequence[InstanceData],
                                    batch_img_metas: Sequence[dict]) -> Tensor:
+        """Convert ground truth to normalized format(0-1)."""
         if isinstance(batch_gt_instances, torch.Tensor):
             batch_targets_normed = (
                 self._extracted_from__convert_gt_to_norm_format_6(
