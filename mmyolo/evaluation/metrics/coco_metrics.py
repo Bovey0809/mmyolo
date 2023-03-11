@@ -56,13 +56,12 @@ class CocoMetric(MMPosCocoMetric):
             scores = data_sample['pred_instances']['scores']
             assert keypoint_scores.shape == keypoints.shape[:2]
 
-            result = dict()
-            # result['id'] = data_sample['id']
-            result['img_id'] = data_sample['img_id']
-            result['keypoints'] = keypoints
-            result['keypoint_scores'] = keypoint_scores
-            result['bbox_scores'] = scores
-
+            result = {
+                'img_id': data_sample['img_id'],
+                'keypoints': keypoints,
+                'keypoint_scores': keypoint_scores,
+                'bbox_scores': scores,
+            }
             # get area information
             if 'bbox_scales' in data_sample['gt_instances']:
                 result['areas'] = np.prod(

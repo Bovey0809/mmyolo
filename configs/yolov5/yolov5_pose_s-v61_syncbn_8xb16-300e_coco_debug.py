@@ -417,7 +417,7 @@ test_pipeline = [
         allow_scale_up=False,
         pad_val=dict(img=114)),
     dict(
-        type='YOLOPosePackInputs',
+        type='mmdet.PackDetInputs',
         meta_keys=('img_id', 'img_path', 'ori_shape', 'img_shape',
                    'scale_factor', 'pad_param'))
 ]
@@ -481,11 +481,11 @@ val_evaluator = [
         proposal_nums=(100, 1, 10),
         ann_file=data_root + val_ann_file,
         metric='bbox'),
-    # dict(
-    #     type='CocoMetric',
-    #     ann_file=data_root + val_ann_file,
-    #     score_mode='bbox',
-    #     nms_mode='none')
+    dict(
+        type='CocoMetric',
+        ann_file=data_root + val_ann_file,
+        score_mode='bbox',
+        nms_mode='none')
 ]
 test_evaluator = val_evaluator
 

@@ -32,6 +32,7 @@ class YOLOv5PoseKptCoder(BaseBBoxCoder):
         Returns:
             torch.Tensor: Decoded boxes.
         """
+        # pred_kpts = pred_kpts.sigmoid()
         bs, n, _ = pred_kpts.shape
         pred_kpts = pred_kpts.view(bs, n, -1, 2)
 

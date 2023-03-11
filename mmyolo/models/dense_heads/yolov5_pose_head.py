@@ -254,6 +254,11 @@ class YOLOv5PoseHead(BaseDenseHead):
                      reduction='mean',
                      loss_weight=1.0),
                  loss_kpt: ConfigType = dict(type='OksLoss'),
+                 loss_vis: ConfigType = dict(
+                     type='mmdet.CrossEntropyLoss',
+                     use_sigmoid=True,
+                     reduction='mean',
+                     loss_weight=1.0),
                  prior_match_thr: float = 4.0,
                  near_neighbor_thr: float = 0.5,
                  ignore_iof_thr: float = -1.0,
@@ -276,6 +281,7 @@ class YOLOv5PoseHead(BaseDenseHead):
         self.loss_bbox: nn.Module = MODELS.build(loss_bbox)
         self.loss_obj: nn.Module = MODELS.build(loss_obj)
         self.loss_kpt: nn.Module = MODELS.build(loss_kpt)
+        self.loss_vis: nn.Module = MODELS.build(loss_vis)
 
         self.prior_generator = TASK_UTILS.build(prior_generator)
         self.bbox_coder = TASK_UTILS.build(bbox_coder)
@@ -485,6 +491,8 @@ class YOLOv5PoseHead(BaseDenseHead):
                 bboxes = bboxes[conf_inds, :]
                 scores = scores[conf_inds, :]
                 objectness = objectness[conf_inds]
+                keypoints = keypoints[conf_inds, :]
+                kpt_vis = kpt_vis[conf_inds, :]
 
             if objectness is not None:
                 # conf = obj_conf * cls_conf
@@ -779,9 +787,9 @@ class YOLOv5PoseHead(BaseDenseHead):
                                                            priors_inds, :,
                                                            grid_y_inds,
                                                            grid_x_inds]
-            loss_vis_i = self.loss_obj(
-                retained_vis_pred,
-                kpt_mask.float()) * self.obj_level_weights[i]
+            loss_vis_i = self.loss_vis(
+                retained_vis_pred[kpt_mask],
+                kpt_mask[kpt_mask]) * self.obj_level_weights[i]
             loss_vis += loss_vis_i
 
             # obj loss

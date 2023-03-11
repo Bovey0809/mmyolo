@@ -19,9 +19,7 @@
       "program": "tools/train.py",
       "console": "integratedTerminal",
       "justMyCode": false,
-      "args": [
-        "${file}"
-      ],
+      "args": ["${file}"],
       "env": {
         "CUDA_LAUNCH_BLOCKING": "1"
       }
@@ -42,7 +40,7 @@
         "-m",
         "pipeline",
         "-p",
-        "val"
+        "train"
       ]
     },
     {
@@ -53,12 +51,8 @@
       "console": "integratedTerminal",
       "justMyCode": false,
       "args": [
-        "configs/yolox/yoloxkptonly_s_8xb8-100e_coco6280.py",
-        // "configs/yolox/yoloxkpt_s_8xb8-300e_coco_mini_debug.py",
-        // "work_dirs/yoloxkpt_s_8xb8-300e_coco/yoloxkpt_s_8xb8-300e_coco.py",
-        // "work_dirs/yoloxkpt_s_8xb8-300e_coco/best_coco/bbox_mAP_epoch_100.pth",
-        "/home/houbowei/mmyolo/work_dirs/yoloxkptonly_s_8xb32-300e_coco/epoch_300.pth"
-        // "/home/houbowei/yolox-pose/YOLOX_outputs/kpt_anno_separate_head/best_ckpt_mmyolo.pth"
+        "configs/yolov5/yolov5_pose_s-v61_syncbn_8xb16-300e_coco.py",
+        "work_dirs/yolov5_pose_s-v61_syncbn_8xb16-300e_coco/epoch_300.pth"
         // "--show",
         // "--json-prefix",
         // "bug"
@@ -89,7 +83,18 @@
         "--src",
         "~/yolox-pose/YOLOX_outputs/kpt_anno_separate_head/best_ckpt.pth",
         "--dst",
-        "~/yolox-pose/YOLOX_outputs/kpt_anno_separate_head/best_ckpt_mmyolo.pth",
+        "~/yolox-pose/YOLOX_outputs/kpt_anno_separate_head/best_ckpt_mmyolo.pth"
+      ]
+    },
+    {
+      "name": "flops",
+      "type": "python",
+      "request": "launch",
+      "program": "tools/analysis_tools/get_flops.py",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "args": [
+        "${file}"
       ]
     }
   ]
